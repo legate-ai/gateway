@@ -1,0 +1,19 @@
+package io.legate.core.audit;
+
+/**
+ * Types of events recorded in the audit log.
+ */
+public enum AuditEventType {
+    REQUEST_BLOCKED,
+    REQUEST_MODIFIED,
+    REQUEST_WARNED,
+    RATE_LIMIT_EXCEEDED,
+    SPEND_LIMIT_EXCEEDED,
+    VIRTUAL_KEY_CREATED,
+    VIRTUAL_KEY_REVOKED,
+    CIRCUIT_BREAKER_OPENED,
+    CIRCUIT_BREAKER_CLOSED,
+    CONFIG_RELOADED,
+    FALLBACK_TRIGGERED,
+    MODEL_ACCESS_DENIED
+}

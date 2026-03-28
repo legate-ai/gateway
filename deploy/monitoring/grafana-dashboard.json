@@ -1,0 +1,166 @@
+{
+  "title": "Legate AI Gateway",
+  "uid": "legate-gateway",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "tags": ["legate", "ai-gateway", "llm"],
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total Requests",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "targets": [{ "expr": "sum(legate_requests_total)", "legendFormat": "Requests" }],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Error Rate",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "targets": [{
+        "expr": "sum(rate(legate_requests_total{status=\"error\"}[5m])) / sum(rate(legate_requests_total[5m]))",
+        "legendFormat": "Error Rate"
+      }],
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "thresholds": { "steps": [{ "color": "green", "value": 0 }, { "color": "yellow", "value": 0.01 }, { "color": "red", "value": 0.05 }] }
+      },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Active Requests",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "targets": [{ "expr": "legate_active_requests", "legendFormat": "Active" }],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Cache Hit Rate",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "targets": [{
+        "expr": "sum(rate(legate_cache_hits_total[5m])) / (sum(rate(legate_cache_hits_total[5m])) + sum(rate(legate_cache_misses_total[5m])))",
+        "legendFormat": "Hit Rate"
+      }],
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Estimated Cost Today (USD)",
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "targets": [{ "expr": "sum(legate_estimated_cost_usd_total)", "legendFormat": "Cost" }],
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" } }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Total Tokens",
+      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+      "targets": [{ "expr": "sum(legate_tokens_total)", "legendFormat": "Tokens" }],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Request Rate (req/min)",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "sum(rate(legate_requests_total[1m])) * 60", "legendFormat": "All" },
+        { "expr": "sum(rate(legate_requests_total{status=\"success\"}[1m])) * 60", "legendFormat": "Success" },
+        { "expr": "sum(rate(legate_requests_total{status=\"error\"}[1m])) * 60", "legendFormat": "Error" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqpm" } }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Latency Percentiles (ms)",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(legate_request_duration_seconds_bucket[5m])) by (le)) * 1000", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(legate_request_duration_seconds_bucket[5m])) by (le)) * 1000", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(legate_request_duration_seconds_bucket[5m])) by (le)) * 1000", "legendFormat": "p99" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Token Usage (tokens/min)",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "sum(rate(legate_tokens_total{direction=\"input\"}[1m])) * 60", "legendFormat": "Input Tokens" },
+        { "expr": "sum(rate(legate_tokens_total{direction=\"output\"}[1m])) * 60", "legendFormat": "Output Tokens" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Estimated Cost (USD/hour)",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "sum(rate(legate_estimated_cost_usd_total[1h])) * 3600", "legendFormat": "Cost/hour" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" } }
+    },
+    {
+      "id": 30,
+      "type": "barchart",
+      "title": "Requests by Provider",
+      "gridPos": { "x": 0, "y": 20, "w": 8, "h": 8 },
+      "targets": [
+        { "expr": "sum(legate_requests_total) by (provider)", "legendFormat": "{{provider}}" }
+      ]
+    },
+    {
+      "id": 31,
+      "type": "barchart",
+      "title": "Requests by Model",
+      "gridPos": { "x": 8, "y": 20, "w": 8, "h": 8 },
+      "targets": [
+        { "expr": "topk(10, sum(legate_requests_total) by (model))", "legendFormat": "{{model}}" }
+      ]
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Fallbacks Triggered",
+      "gridPos": { "x": 16, "y": 20, "w": 8, "h": 8 },
+      "targets": [
+        { "expr": "sum(rate(legate_fallbacks_total[5m])) * 60", "legendFormat": "Fallbacks/min" }
+      ]
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "Cache Hits vs Misses",
+      "gridPos": { "x": 0, "y": 28, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "sum(rate(legate_cache_hits_total[1m])) * 60", "legendFormat": "Hits/min" },
+        { "expr": "sum(rate(legate_cache_misses_total[1m])) * 60", "legendFormat": "Misses/min" }
+      ]
+    },
+    {
+      "id": 41,
+      "type": "table",
+      "title": "Cost by Virtual Key",
+      "gridPos": { "x": 12, "y": 28, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "topk(20, sum(legate_estimated_cost_usd_total) by (virtual_key))", "legendFormat": "{{virtual_key}}", "instant": true }
+      ],
+      "transformations": [{ "id": "labelsToFields" }]
+    }
+  ]
+}

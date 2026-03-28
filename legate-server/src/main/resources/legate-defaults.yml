@@ -1,0 +1,98 @@
+# =============================================================================
+# Legate AI Gateway — Default Configuration
+# =============================================================================
+# This file ships with the legate-server jar and provides sensible defaults for
+# all legate.* properties. Values here are overridden by:
+#   1. Your application.yml / application.properties
+#   2. Environment variables (LEGATE_* prefix, Spring relaxed binding)
+#   3. System properties (-Dlegate.*)
+#
+# To use custom providers, copy the relevant section into your own application.yml
+# and fill in the values. Do NOT commit API keys — always reference them via
+# environment variables using the api-key-env-var field.
+# =============================================================================
+
+legate:
+
+  # ---------------------------------------------------------------------------
+  # Providers
+  # ---------------------------------------------------------------------------
+  # No default providers are defined here — provider instances are specific
+  # to each deployment and must be configured in application.yml.
+  #
+  # Example (in your application.yml):
+  #   legate:
+  #     providers:
+  #       - name: my-openai
+  #         type: openai
+  #         base-url: https://api.openai.com
+  #         api-key-env-var: MY_OPENAI_KEY
+  #         models:
+  #           - gpt-4o
+  # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # Routing
+  # ---------------------------------------------------------------------------
+  routing:
+    # Convenient aliases — clients use short names, Legate resolves to model IDs
+    aliases:
+      smart:  gpt-4o
+      fast:   gpt-4o-mini
+      claude: claude-3-5-sonnet-20241022
+    retry:
+      max-attempts: 1
+      backoff: NONE
+    circuit-breaker:
+      failure-threshold: 5
+      success-threshold: 2
+      timeout: 30s
+    load-balancer:
+      strategy: ROUND_ROBIN
+
+  # ---------------------------------------------------------------------------
+  # Guards (disabled by default — opt-in)
+  # ---------------------------------------------------------------------------
+  guards:
+    request: []
+    response: []
+
+  # ---------------------------------------------------------------------------
+  # Cache (disabled by default)
+  # ---------------------------------------------------------------------------
+  cache:
+    enabled: false
+    backend: MEMORY
+    max-size: 1000
+    ttl: 1h
+
+  # ---------------------------------------------------------------------------
+  # Rate limiting (disabled by default)
+  # ---------------------------------------------------------------------------
+  rate-limiting:
+    enabled: false
+
+  # ---------------------------------------------------------------------------
+  # Spend controls (disabled by default)
+  # ---------------------------------------------------------------------------
+  spend-control:
+    enabled: false
+
+  # ---------------------------------------------------------------------------
+  # Logging
+  # ---------------------------------------------------------------------------
+  logging:
+    content:
+      log-prompts: false
+      log-responses: false
+    destinations:
+      - type: CONSOLE
+        format: JSON
+
+  # ---------------------------------------------------------------------------
+  # Admin API
+  # ---------------------------------------------------------------------------
+  admin:
+    require-auth: false   # Set to true and provide admin.token in production
+    token: ""
+    port: 8080            # Same port as main API by default

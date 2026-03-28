@@ -1,0 +1,187 @@
+package io.legate.core.ratelimit;
+
+import io.github.resilience4j.ratelimiter.RateLimiterConfig;
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import io.legate.core.config.ratelimit.RateLimitingConfig;
+import io.legate.core.config.ratelimit.RateLimitingConfig.RateLimitConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * Rate limiter backed by Resilience4j for per-key request-rate enforcement (RPM),
+ * with a lightweight custom {@code DailyTokenCounter} for daily LLM-token quota.
+ *
+ * <p>Two independent axes per virtual key:</p>
+ * <ol>
+ *   <li><b>Request rate</b> — managed by a Resilience4j {@link io.github.resilience4j.ratelimiter.RateLimiter}
+ *       with {@code limitForPeriod = requestsPerMinute} and a 60-second refresh window.</li>
+ *   <li><b>Daily token quota</b> — tracked by an {@link AtomicLong} counter that resets at UTC midnight.
+ *       Resilience4j does not support post-call permit deduction, so a simple counter is used here
+ *       to allow accurate accounting via {@link #reportUsage}.</li>
+ * </ol>
+ *
+ * <p>Both the global key ({@code "__global__"}) and per-virtual-key buckets are maintained
+ * independently. A request is denied if <em>either</em> is exhausted.</p>
+ *
+ * <p>Thread-safe: Resilience4j's registry and {@code AtomicLong} ensure concurrent safety.</p>
+ */
+public class Resilience4jRateLimiter implements RateLimiter {
+
+    private static final Logger log = LoggerFactory.getLogger(Resilience4jRateLimiter.class);
+    static final String GLOBAL_KEY = "__global__";
+
+    private final RateLimitingConfig config;
+    private final RateLimiterRegistry r4jRegistry;
+    private final ConcurrentHashMap<String, DailyTokenCounter> tokenCounters = new ConcurrentHashMap<>();
+
+    /**
+     * Creates a rate limiter from the given configuration.
+     *
+     * @param config rate-limiting configuration; must not be {@code null}
+     */
+    public Resilience4jRateLimiter(RateLimitingConfig config) {
+        this.config = config;
+        this.r4jRegistry = RateLimiterRegistry.ofDefaults();
+    }
+
+    @Override
+    public RateLimitResult tryAcquire(String key, int estimatedTokens) {
+        // Check global limit first
+        RateLimitConfig globalCfg = config.global();
+        if (globalCfg != null && !globalCfg.isUnlimited()) {
+            RateLimitResult result = checkLimits(GLOBAL_KEY, globalCfg, estimatedTokens);
+            if (result instanceof RateLimitResult.Denied) {
+                return result;
+            }
+        }
+
+        // Check per-key limit
+        RateLimitConfig keyCfg = config.resolvePerKeyLimit(key);
+        if (!keyCfg.isUnlimited()) {
+            return checkLimits(key, keyCfg, estimatedTokens);
+        }
+
+        return new RateLimitResult.Allowed(Integer.MAX_VALUE, Long.MAX_VALUE,
+                Instant.now().plusSeconds(60));
+    }
+
+    @Override
+    public void reportUsage(String key, int actualTokens) {
+        if (actualTokens <= 0) {
+            return;
+        }
+
+        // Deduct from global token counter
+        RateLimitConfig globalCfg = config.global();
+        if (globalCfg != null && globalCfg.hasTokenLimit()) {
+            getOrCreateTokenCounter(GLOBAL_KEY).add(actualTokens);
+        }
+
+        // Deduct from per-key token counter
+        RateLimitConfig keyCfg = config.resolvePerKeyLimit(key);
+        if (keyCfg.hasTokenLimit()) {
+            getOrCreateTokenCounter(key).add(actualTokens);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+
+    private RateLimitResult checkLimits(String key, RateLimitConfig cfg, int estimatedTokens) {
+        io.github.resilience4j.ratelimiter.RateLimiter rl =
+                cfg.hasRequestLimit() ? getOrCreateRequestRateLimiter(key, cfg) : null;
+
+        // Check request rate with Resilience4j
+        if (rl != null && !rl.acquirePermission()) {
+            long retryAfter = 60L / Math.max(1, cfg.requestsPerMinute());
+            return new RateLimitResult.Denied(
+                    "Request rate limit exceeded: " + cfg.requestsPerMinute()
+                            + " req/min for key '" + key + "'",
+                    retryAfter,
+                    cfg.requestsPerMinute(),
+                    cfg.requestsPerMinute() - Math.max(0,
+                            rl.getMetrics().getAvailablePermissions()));
+        }
+
+        // Check daily token quota (custom counter — Resilience4j does not support post-call deduction)
+        if (cfg.hasTokenLimit()) {
+            DailyTokenCounter counter = getOrCreateTokenCounter(key);
+            long used = counter.getUsed();
+            if (used + estimatedTokens > cfg.tokensPerDay()) {
+                long secondsUntilReset = secondsUntilMidnightUtc();
+                return new RateLimitResult.Denied(
+                        "Daily token limit exceeded: " + cfg.tokensPerDay()
+                                + " tokens/day for key '" + key + "'",
+                        secondsUntilReset,
+                        cfg.tokensPerDay(),
+                        used);
+            }
+        }
+
+        int remainingRequests = rl != null
+                ? Math.max(0, rl.getMetrics().getAvailablePermissions())
+                : Integer.MAX_VALUE;
+        long remainingTokens = cfg.hasTokenLimit()
+                ? cfg.tokensPerDay() - getOrCreateTokenCounter(key).getUsed()
+                : Long.MAX_VALUE;
+
+        return new RateLimitResult.Allowed(remainingRequests, remainingTokens,
+                Instant.now().plusSeconds(60));
+    }
+
+    private io.github.resilience4j.ratelimiter.RateLimiter getOrCreateRequestRateLimiter(
+            String key, RateLimitConfig cfg) {
+        return r4jRegistry.rateLimiter(key,
+                RateLimiterConfig.custom()
+                        .limitForPeriod(cfg.requestsPerMinute())
+                        .limitRefreshPeriod(Duration.ofSeconds(60))
+                        .timeoutDuration(Duration.ZERO)   // non-blocking: return false immediately
+                        .build());
+    }
+
+    private DailyTokenCounter getOrCreateTokenCounter(String key) {
+        return tokenCounters.computeIfAbsent(key, k -> new DailyTokenCounter());
+    }
+
+    private static long secondsUntilMidnightUtc() {
+        long now = Instant.now().getEpochSecond();
+        long midnightTomorrow = LocalDate.now(ZoneOffset.UTC)
+                .plusDays(1)
+                .atStartOfDay(ZoneOffset.UTC)
+                .toEpochSecond();
+        return Math.max(60L, midnightTomorrow - now);
+    }
+
+    // -------------------------------------------------------------------------
+    // Daily token counter — resets at UTC midnight
+    // -------------------------------------------------------------------------
+
+    private static final class DailyTokenCounter {
+        private final AtomicLong used = new AtomicLong(0);
+        private volatile LocalDate date = LocalDate.now(ZoneOffset.UTC);
+
+        void add(long tokens) {
+            resetIfNewDay();
+            used.addAndGet(tokens);
+        }
+
+        long getUsed() {
+            resetIfNewDay();
+            return used.get();
+        }
+
+        private synchronized void resetIfNewDay() {
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
+            if (!today.equals(date)) {
+                used.set(0);
+                date = today;
+            }
+        }
+    }
+}

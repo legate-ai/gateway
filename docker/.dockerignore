@@ -1,0 +1,33 @@
+# Build artifacts
+**/build/
+**/target/
+**/.gradle/
+**/.classpath
+**/.project
+**/.settings/
+
+# IDE files
+**/.idea/
+**/*.iml
+**/.vscode/
+
+# OS files
+**/.DS_Store
+**/Thumbs.db
+
+# Git
+**/.git/
+**/.gitignore
+
+# Documentation
+**/README.md
+**/docs/
+
+# Docker
+**/Dockerfile
+**/docker-compose.yml
+**/.dockerignore
+
+# Test reports
+**/test-results/
+**/coverage/

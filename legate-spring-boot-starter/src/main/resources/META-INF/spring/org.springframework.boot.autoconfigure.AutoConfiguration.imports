@@ -1,0 +1,3 @@
+io.legate.spring.autoconfigure.LegateAutoConfiguration
+io.legate.spring.autoconfigure.LegateGuardAutoConfiguration
+io.legate.spring.autoconfigure.LegateClientAutoConfiguration

@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  legate:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: legate-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      # Provider API keys (set these before running)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+
+      # Admin token
+      - LEGATE_ADMIN_TOKEN=${LEGATE_ADMIN_TOKEN:-change-me}
+
+      # Server config
+      - SERVER_PORT=8080
+      - SPRING_PROFILES_ACTIVE=default
+
+      # JVM options
+      - JAVA_OPTS=-Xmx512m -XX:+UseZGC
+
+      # Redis (Phase 4 — uncomment to enable)
+      # - SPRING_DATA_REDIS_HOST=redis
+      # - SPRING_DATA_REDIS_PORT=6379
+      # - LEGATE_CACHE_BACKEND=REDIS
+
+      # PostgreSQL (Phase 4 — uncomment to enable)
+      # - SPRING_R2DBC_URL=r2dbc:postgresql://postgres:5432/legate
+      # - SPRING_R2DBC_USERNAME=legate
+      # - SPRING_R2DBC_PASSWORD=legate
+      # - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/legate
+      # - SPRING_DATASOURCE_USERNAME=legate
+      # - SPRING_DATASOURCE_PASSWORD=legate
+      # - LEGATE_STORE_TYPE=postgres
+
+    depends_on:
+      redis:
+        condition: service_healthy
+        required: false
+      postgres:
+        condition: service_healthy
+        required: false
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+
+    restart: unless-stopped
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Redis (Phase 4 cache + rate limiting) ──────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: legate-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - redis
+      - full
+
+  # ── PostgreSQL (Phase 4 persistent store) ─────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: legate-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=legate
+      - POSTGRES_USER=legate
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-legate}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U legate -d legate"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - postgres
+      - full
+
+  # ── Prometheus (optional observability) ───────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: legate-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+    restart: unless-stopped
+    profiles:
+      - monitoring
+      - full
+
+volumes:
+  postgres_data:
+    driver: local

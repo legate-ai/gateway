@@ -1,0 +1,143 @@
+# Legate AI Gateway — Helm Values
+# See docs/CONFIGURATION.md for full configuration reference.
+
+# ── Image ─────────────────────────────────────────────────────────────────────
+image:
+  repository: legateai/legate
+  pullPolicy: IfNotPresent
+  tag: ""  # Defaults to Chart appVersion
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# ── Replicas & scaling ────────────────────────────────────────────────────────
+replicaCount: 3
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+# ── Service ───────────────────────────────────────────────────────────────────
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: legate.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# ── Resources ─────────────────────────────────────────────────────────────────
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "250m"
+  limits:
+    memory: "512Mi"
+    cpu: "1000m"
+
+# ── Environment & secrets ─────────────────────────────────────────────────────
+env:
+  JAVA_OPTS: "-Xmx384m -XX:+UseZGC"
+  SERVER_PORT: "8080"
+
+# API keys are mounted from a Secret
+secrets:
+  create: true        # set false if you manage the Secret externally
+  openaiApiKey: ""    # value for OPENAI_API_KEY
+  anthropicApiKey: "" # value for ANTHROPIC_API_KEY
+  adminToken: "change-me-in-production"
+
+# ── Legate configuration ──────────────────────────────────────────────────────
+# This is mounted as /app/config/legate.yml
+legateConfig: |
+  legate:
+    providers:
+      - name: openai
+        type: openai
+        api-key: "${OPENAI_API_KEY}"
+      - name: anthropic
+        type: anthropic
+        api-key: "${ANTHROPIC_API_KEY}"
+    routing:
+      default-provider: openai
+    cache:
+      enabled: false
+    rate-limiting: {}
+    admin:
+      token: "${LEGATE_ADMIN_TOKEN}"
+
+# ── Probes ────────────────────────────────────────────────────────────────────
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: 8080
+  initialDelaySeconds: 15
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# ── Pod disruption budget ─────────────────────────────────────────────────────
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# ── Anti-affinity ─────────────────────────────────────────────────────────────
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - legate
+          topologyKey: kubernetes.io/hostname
+
+# ── Service account ───────────────────────────────────────────────────────────
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# ── Prometheus ServiceMonitor ─────────────────────────────────────────────────
+serviceMonitor:
+  enabled: false
+  namespace: ""
+  interval: 30s
+  scrapeTimeout: 10s
+
+# ── Pod security context ──────────────────────────────────────────────────────
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL

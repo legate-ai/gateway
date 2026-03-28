@@ -1,0 +1,64 @@
+server:
+  port: 8080
+
+logging:
+  structured:
+    format:
+      console: ecs   # Elastic Common Schema — one JSON object per log line; MDC fields appear under labels.*
+
+spring:
+  application:
+    name: legate
+  main:
+    web-application-type: reactive
+  codec:
+    max-in-memory-size: 10MB
+  config:
+    import: "classpath:legate-defaults.yml"
+
+legate:
+  providers:
+    - name: ollama-local
+      type: OLLAMA
+      base-url: http://localhost:11434
+      models:
+        - gemma3:1b
+      connect-timeout: 10s
+      read-timeout: 120s
+
+  routing:
+    aliases:
+      local: gemma3:1b
+    default-chain: ollama
+    fallback-chains:
+      ollama:
+        endpoints:
+          - provider: ollama-local
+            model: gemma3:1b
+
+
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  tracing:
+    enabled: ${legate.tracing.enabled:false}
+    sampling:
+      probability: ${legate.tracing.sample-rate:1.0}
+  otlp:
+    tracing:
+      endpoint: ${legate.tracing.endpoint:http://localhost:4317}
+
