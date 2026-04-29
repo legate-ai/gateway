@@ -128,10 +128,10 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 │       Legate Gateway            │
 │  ┌───────────────────────────┐  │
 │  │  Request Pipeline         │  │
-│  │  • Auth (Phase 2)         │  │
-│  │  • Rate Limit (Phase 2)   │  │
-│  │  • Guards (Phase 3)       │  │
-│  │  • Cache (Phase 3)        │  │
+│  │  • Auth                   │  │
+│  │  • Rate Limit             │  │
+│  │  • Guards                 │  │
+│  │  • Cache                  │  │
 │  │  • Routing Engine         │  │
 │  └───────────────────────────┘  │
 └────────┬──────────┬─────────────┘
@@ -235,9 +235,9 @@ Apache License 2.0 — see [LICENSE](LICENSE) for details.
 
 ## Community
 
-- **GitHub:** [github.com/legate-ai/legate](https://github.com/legate-ai/legate)
-- **Issues:** [Report bugs and request features](https://github.com/legate-ai/legate/issues)
-- **Discussions:** [Join the conversation](https://github.com/legate-ai/legate/discussions)
+- **GitHub:** [github.com/legate-ai/legate](https://github.com/legate-ai/gateway)
+- **Issues:** [Report bugs and request features](https://github.com/legate-ai/gateway/issues)
+- **Discussions:** [Join the conversation](https://github.com/legate-ai/gateway/discussions)
 
 ---
 
