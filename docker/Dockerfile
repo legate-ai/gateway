@@ -15,8 +15,12 @@ COPY legate-bom/build.gradle.kts legate-bom/
 COPY legate-core/build.gradle.kts legate-core/
 COPY legate-provider-openai/build.gradle.kts legate-provider-openai/
 COPY legate-provider-anthropic/build.gradle.kts legate-provider-anthropic/
+COPY legate-provider-azure/build.gradle.kts legate-provider-azure/
+COPY legate-provider-ollama/build.gradle.kts legate-provider-ollama/
 COPY legate-spring-boot-starter/build.gradle.kts legate-spring-boot-starter/
 COPY legate-server/build.gradle.kts legate-server/
+COPY legate-store-redis/build.gradle.kts legate-store-redis/
+COPY legate-store-postgres/build.gradle.kts legate-store-postgres/
 
 # Download dependencies (cached layer)
 RUN ./gradlew dependencies --no-daemon || true
@@ -25,8 +29,12 @@ RUN ./gradlew dependencies --no-daemon || true
 COPY legate-core/src legate-core/src
 COPY legate-provider-openai/src legate-provider-openai/src
 COPY legate-provider-anthropic/src legate-provider-anthropic/src
+COPY legate-provider-azure/src legate-provider-azure/src
+COPY legate-provider-ollama/src legate-provider-ollama/src
 COPY legate-spring-boot-starter/src legate-spring-boot-starter/src
 COPY legate-server/src legate-server/src
+COPY legate-store-redis/src legate-store-redis/src
+COPY legate-store-postgres/src legate-store-postgres/src
 
 # Build the application
 RUN ./gradlew :legate-server:bootJar -x test --no-daemon

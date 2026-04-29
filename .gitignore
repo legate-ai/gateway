@@ -41,7 +41,8 @@ Thumbs.db
 *.jks
 *.pfx
 
-# Warden runtime files
+# Runtime key files
+legate-keys.yml
 warden-keys.yml
 warden.yml
 

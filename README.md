@@ -35,8 +35,8 @@ docker run -p 8080:8080 \
 
 ```bash
 # Clone the repository
-git clone https://github.com/legate-ai/legate.git
-cd legate
+git clone https://github.com/legate-ai/gateway.git
+cd gateway
 
 # Build
 ./gradlew build
@@ -78,7 +78,7 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 
 ## Features
 
-### Phase 1 (v0.1.0) — "It Works" ✅
+### Phase 1
 
 - [x] Unified OpenAI-compatible API
 - [x] Provider adapters: OpenAI, Anthropic
@@ -88,7 +88,7 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 - [x] Docker containerization
 - [x] Health endpoints
 
-### Phase 2 (v0.2.0) — "It's Reliable" (Coming Soon)
+### Phase 2
 
 - [ ] Fallback chains with automatic retry
 - [ ] Circuit breakers for provider health
@@ -98,7 +98,7 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 - [ ] Configuration hot-reload
 - [ ] Additional providers: Azure, Bedrock, Vertex AI, Ollama
 
-### Phase 3 (v0.3.0) — "It's Governed" (Planned)
+### Phase 3
 
 - [ ] Content guards (PII detection, keyword filtering)
 - [ ] Spend tracking and limits
@@ -107,13 +107,13 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 - [ ] Response caching
 - [ ] Prometheus metrics
 
-### Phase 4 (v0.4.0) — "It Scales" (Planned)
+### Phase 4
 
 - [ ] Redis for distributed caching and rate limiting
 - [ ] PostgreSQL for audit logs and virtual keys
 - [ ] OpenTelemetry distributed tracing
 - [ ] Kubernetes Helm chart
-- [ ] Embedded mode (Spring Boot Starter)
+- [ ] SDK
 
 ## Architecture
 
@@ -163,14 +163,12 @@ ANTHROPIC_API_KEY=sk-ant-...
 SERVER_PORT=8080
 ```
 
-Phase 2+ will support full YAML configuration with hot-reload.
-
 ## Development
 
 ### Prerequisites
 
 - Java 25 (Eclipse Temurin recommended)
-- Gradle 8.12+ (included via wrapper)
+- Gradle 9.0.0 (included via wrapper)
 - Docker (for containerization)
 
 ### Build Commands
@@ -198,7 +196,7 @@ docker compose -f docker/docker-compose.yml up
 ### Project Structure
 
 ```
-legate/
+gateway/
 ├── legate-core/                 # Core domain logic (zero Spring dependency)
 ├── legate-provider-openai/      # OpenAI adapter
 ├── legate-provider-anthropic/   # Anthropic adapter
@@ -217,13 +215,6 @@ legate/
 | AWS Bedrock | 🚧 Phase 2 | | |
 | Google Vertex AI | 🚧 Phase 2 | | |
 | Ollama (local) | 🚧 Phase 2 | | |
-
-## Performance
-
-Phase 1 benchmarks (coming soon):
-- **Latency overhead:** <5ms p50, <15ms p99
-- **Throughput:** 10,000+ req/sec (non-streaming)
-- **Memory:** ~512MB baseline
 
 ## Contributing
 

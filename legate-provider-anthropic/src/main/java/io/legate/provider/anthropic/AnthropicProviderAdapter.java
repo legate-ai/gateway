@@ -1,6 +1,7 @@
 package io.legate.provider.anthropic;
 
 import tools.jackson.databind.ObjectMapper;
+import io.legate.core.exception.UpstreamException;
 import io.legate.core.model.*;
 import io.legate.core.provider.ProviderAdapter;
 import io.legate.core.provider.ProviderHttpRequest;
@@ -22,6 +23,7 @@ public class AnthropicProviderAdapter implements ProviderAdapter {
     private static final Logger log = LoggerFactory.getLogger(AnthropicProviderAdapter.class);
     private static final String PROVIDER_NAME = "anthropic";
     private static final String ANTHROPIC_VERSION = "2023-06-01";
+    private static final String ANTHROPIC_BETA_CACHE = "prompt-caching-2024-07-31";
     private static final int DEFAULT_MAX_TOKENS = 4096;
 
     private final ObjectMapper objectMapper;
@@ -52,16 +54,15 @@ public class AnthropicProviderAdapter implements ProviderAdapter {
         ChatCompletionRequest request,
         ResolvedEndpoint endpoint
     ) throws Exception {
-        // Extract system messages
-        String systemPrompt = extractSystemPrompt(request.messages());
+        // Extract system messages, preserving cache_control hints from extra map
+        Object system = buildSystemParam(request.messages(), request.extra());
 
-        // Filter out system messages from the messages list
+        // Filter out system messages; translate each message, preserving cache_control
         List<AnthropicMessage> anthropicMessages = request.messages().stream()
             .filter(msg -> !"system".equals(msg.role()))
             .map(this::translateMessage)
             .collect(Collectors.toList());
 
-        // Build Anthropic request
         int maxTokens = request.maxTokens() != null ? request.maxTokens() : DEFAULT_MAX_TOKENS;
         if (request.maxCompletionTokens() != null) {
             maxTokens = request.maxCompletionTokens();
@@ -70,22 +71,26 @@ public class AnthropicProviderAdapter implements ProviderAdapter {
         var anthropicRequest = new AnthropicRequest(
             request.model(),
             anthropicMessages,
-            systemPrompt,
+            system,
             maxTokens,
             request.temperature(),
             request.topP(),
-            null, // topK not in OpenAI format
+            null,
             convertStopSequences(request.stop()),
             request.stream(),
-            null, // metadata
-            null  // tools - TODO: implement tool translation
+            null,
+            null
         );
 
-        // Build headers
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", "application/json");
         headers.put("anthropic-version", ANTHROPIC_VERSION);
         addAuthenticationHeader(headers, endpoint.credentials());
+
+        // Enable prompt-caching beta header when any cache_control blocks are present
+        if (hasCacheControl(system, anthropicMessages)) {
+            headers.put("anthropic-beta", ANTHROPIC_BETA_CACHE);
+        }
 
         // Build URL
         String url = buildUrl(endpoint.baseUrl());
@@ -93,8 +98,8 @@ public class AnthropicProviderAdapter implements ProviderAdapter {
         // Serialize request
         String body = objectMapper.writeValueAsString(anthropicRequest);
 
-        log.debug("Translating request for Anthropic: model={}, system_length={}, messages={}",
-            request.model(), systemPrompt != null ? systemPrompt.length() : 0, anthropicMessages.size());
+        log.debug("Translating request for Anthropic: model={}, has_system={}, messages={}",
+            request.model(), system != null, anthropicMessages.size());
 
         return ProviderHttpRequest.post(url, headers, body);
     }
@@ -104,7 +109,7 @@ public class AnthropicProviderAdapter implements ProviderAdapter {
         if (!response.isSuccess()) {
             log.error("Anthropic returned error status: {} - {}",
                 response.statusCode(), response.body());
-            throw new RuntimeException("Anthropic API error: " + response.statusCode());
+            throw new UpstreamException(PROVIDER_NAME, response.statusCode(), response.body());
         }
 
         AnthropicResponse anthropicResponse = objectMapper.readValue(
@@ -189,20 +194,54 @@ public class AnthropicProviderAdapter implements ProviderAdapter {
     }
 
     /**
-     * Extracts system prompt from messages (all system role messages concatenated).
+     * Builds the system parameter. When the extra map contains {@code "cache_system": true},
+     * wraps the system prompt in a {@link AnthropicMessage.SystemBlock} list with
+     * {@code cache_control: {type: ephemeral}} so the prefix is eligible for caching.
      */
-    private String extractSystemPrompt(List<Message> messages) {
+    @SuppressWarnings("unchecked")
+    private Object buildSystemParam(List<Message> messages, java.util.Map<String, Object> extra) {
         if (messages == null) {
             return null;
         }
-
-        String systemPrompt = messages.stream()
+        String systemText = messages.stream()
             .filter(msg -> "system".equals(msg.role()))
             .map(Message::content)
             .filter(Objects::nonNull)
             .collect(Collectors.joining("\n\n"));
 
-        return systemPrompt.isEmpty() ? null : systemPrompt;
+        if (systemText.isEmpty()) {
+            return null;
+        }
+        // If the caller signals caching intent via extra, emit a block list
+        boolean cacheSystem = extra != null && Boolean.TRUE.equals(extra.get("cache_system"));
+        if (cacheSystem) {
+            return List.of(AnthropicMessage.SystemBlock.cachedText(systemText));
+        }
+        return systemText;
+    }
+
+    /**
+     * Returns true if any system block or message content block carries a cache_control directive.
+     */
+    @SuppressWarnings("unchecked")
+    private boolean hasCacheControl(Object system, List<AnthropicMessage> messages) {
+        if (system instanceof List<?> blocks) {
+            for (Object block : blocks) {
+                if (block instanceof AnthropicMessage.SystemBlock sb && sb.hasCacheControl()) {
+                    return true;
+                }
+            }
+        }
+        for (AnthropicMessage msg : messages) {
+            if (msg.content() instanceof List<?> contentBlocks) {
+                for (Object b : contentBlocks) {
+                    if (b instanceof AnthropicMessage.ContentBlock cb && cb.cacheControl() != null) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -246,6 +285,25 @@ public class AnthropicProviderAdapter implements ProviderAdapter {
             case "tool_use" -> "tool_calls";
             default -> anthropicStopReason;
         };
+    }
+
+    @Override
+    public boolean supportsNativeMessages() {
+        return true;
+    }
+
+    @Override
+    public ProviderHttpRequest translateNativeMessagesRequest(
+        String rawBody, ResolvedEndpoint endpoint
+    ) throws Exception {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json");
+        headers.put("anthropic-version", ANTHROPIC_VERSION);
+        addAuthenticationHeader(headers, endpoint.credentials());
+        if (rawBody != null && rawBody.contains("cache_control")) {
+            headers.put("anthropic-beta", ANTHROPIC_BETA_CACHE);
+        }
+        return ProviderHttpRequest.post(buildUrl(endpoint.baseUrl()), headers, rawBody);
     }
 
     /**

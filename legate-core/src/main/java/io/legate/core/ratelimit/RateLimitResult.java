@@ -25,8 +25,13 @@ public sealed interface RateLimitResult {
     record Allowed(
             int remainingRequests,
             long remainingTokens,
-            Instant resetsAt
+            Instant resetsAt,
+            int reservedTokens
     ) implements RateLimitResult {
+        /** Backwards-compatible constructor — no pre-reservation. */
+        public Allowed(int remainingRequests, long remainingTokens, Instant resetsAt) {
+            this(remainingRequests, remainingTokens, resetsAt, 0);
+        }
     }
 
     /**

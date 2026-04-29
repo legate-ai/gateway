@@ -1,51 +1,41 @@
 package io.legate.server.metrics;
 
 /**
- * Micrometer tag key and well-known tag value constants for Legate metrics.
+ * Metric tag key and value constants aligned with the OTel GenAI semantic conventions.
  *
- * <p>Using typed constants rather than inline strings eliminates typo-induced
- * tag drift and makes refactoring safe. Every tag key used in
- * {@link MetricsCollector} or queried in {@code AdminHandler} must be declared here.</p>
+ * <p>Micrometer translates dot-separated tag names to underscore form for Prometheus.</p>
  */
 public final class MetricTags {
 
-    // ── Tag keys ──────────────────────────────────────────────────────────────
+    // ── Tag keys (OTel GenAI) ─────────────────────────────────────────────────
 
-    /** Upstream LLM provider name (e.g., {@code openai}, {@code anthropic}). */
-    public static final String PROVIDER = "provider";
+    /** AI system name (e.g., "openai", "anthropic"). Maps to {@code gen_ai.system}. */
+    public static final String GEN_AI_SYSTEM = "gen_ai.system";
 
-    /** Model name as requested by the client (e.g., {@code gpt-4o}). */
-    public static final String MODEL = "model";
+    /** Model name requested by the client. Maps to {@code gen_ai.request.model}. */
+    public static final String GEN_AI_REQUEST_MODEL = "gen_ai.request.model";
 
-    /** Virtual key ID that authenticated the request; {@code none} if unauthenticated. */
+    /** Operation type: "chat", "embeddings", "text_completion". Maps to {@code gen_ai.operation.name}. */
+    public static final String GEN_AI_OPERATION = "gen_ai.operation.name";
+
+    /** Token type: "input" or "output". Maps to {@code gen_ai.token.type}. */
+    public static final String GEN_AI_TOKEN_TYPE = "gen_ai.token.type";
+
+    /** Error class name on failure (OTel standard). */
+    public static final String ERROR_TYPE = "error.type";
+
+    // ── Legate-specific tag keys ──────────────────────────────────────────────
+
+    /** Virtual key ID that authenticated the request; "none" if unauthenticated. */
     public static final String VIRTUAL_KEY = "virtual_key";
 
-    /**
-     * Request outcome status.
-     *
-     * @see #STATUS_SUCCESS
-     * @see #STATUS_ERROR
-     */
-    public static final String STATUS = "status";
-
-    /**
-     * Token counting direction.
-     *
-     * @see #DIRECTION_INPUT
-     * @see #DIRECTION_OUTPUT
-     */
-    public static final String DIRECTION = "direction";
-
-    /** Provider that failed before the fallback was triggered. */
-    public static final String FROM_PROVIDER = "from_provider";
+    /** Provider that triggered a fallback. */
+    public static final String FROM_PROVIDER = "gen_ai.system.from";
 
     /** Provider that served the request after a fallback. */
-    public static final String TO_PROVIDER = "to_provider";
+    public static final String TO_PROVIDER = "gen_ai.system.to";
 
-    /**
-     * Spend limit type that was breached.
-     * Typical values: {@code daily}, {@code monthly}.
-     */
+    /** Spend limit type that was breached (e.g., "daily", "monthly"). */
     public static final String LIMIT_TYPE = "limit_type";
 
     /** Circuit breaker state before a transition. */
@@ -56,25 +46,17 @@ public final class MetricTags {
 
     // ── Tag values ────────────────────────────────────────────────────────────
 
-    /** {@link #STATUS} value for successfully completed requests. */
-    public static final String STATUS_SUCCESS = "success";
+    /** {@link #GEN_AI_TOKEN_TYPE} value for prompt/input tokens. */
+    public static final String TOKEN_TYPE_INPUT = "input";
 
-    /** {@link #STATUS} value for failed requests (any error). */
-    public static final String STATUS_ERROR = "error";
+    /** {@link #GEN_AI_TOKEN_TYPE} value for completion/output tokens. */
+    public static final String TOKEN_TYPE_OUTPUT = "output";
 
-    /** {@link #DIRECTION} value for prompt/input tokens. */
-    public static final String DIRECTION_INPUT = "input";
-
-    /** {@link #DIRECTION} value for completion/output tokens. */
-    public static final String DIRECTION_OUTPUT = "output";
-
-    /** Fallback value used when a tag value is absent or unknown. */
+    /** Sentinel for an absent or unknown tag value. */
     public static final String UNKNOWN = "unknown";
 
-    /** Fallback value for {@link #VIRTUAL_KEY} when no key authenticated the request. */
+    /** Sentinel for {@link #VIRTUAL_KEY} when no key authenticated the request. */
     public static final String NONE = "none";
 
-    private MetricTags() {
-        // constants class — no instances
-    }
+    private MetricTags() {}
 }

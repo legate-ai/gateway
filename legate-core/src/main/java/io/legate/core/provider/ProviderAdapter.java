@@ -3,6 +3,8 @@ package io.legate.core.provider;
 import io.legate.core.model.ChatCompletionRequest;
 import io.legate.core.model.ChatCompletionResponse;
 import io.legate.core.model.ChatCompletionChunk;
+import io.legate.core.model.EmbeddingRequest;
+import io.legate.core.model.EmbeddingResponse;
 import io.legate.core.model.Usage;
 import io.legate.core.routing.ResolvedEndpoint;
 
@@ -78,12 +80,68 @@ public interface ProviderAdapter {
 
     /**
      * Extracts usage information from the completed stream context.
-     * Called after the stream finishes to get token counts.
      *
      * @param context the completed stream context
      * @return the usage information, or null if not available
      */
     default Usage extractStreamUsage(StreamContext context) {
         return context.getUsage();
+    }
+
+    /**
+     * Returns true if this adapter supports the embeddings API.
+     * Providers that do not support embeddings should return false (the default).
+     */
+    default boolean supportsEmbeddings() {
+        return false;
+    }
+
+    /**
+     * Returns true if this adapter supports the native messages API (Anthropic format).
+     * Providers that do not support native messages should return false (the default).
+     */
+    default boolean supportsNativeMessages() {
+        return false;
+    }
+
+    /**
+     * Translates a raw native-format request body into a provider-specific HTTP request,
+     * adding credentials and constructing the correct URL.
+     * Only called when {@link #supportsNativeMessages()} returns true.
+     *
+     * @throws UnsupportedOperationException if this provider does not support native messages
+     */
+    default ProviderHttpRequest translateNativeMessagesRequest(
+        String rawBody, ResolvedEndpoint endpoint
+    ) throws Exception {
+        throw new UnsupportedOperationException(
+            getProviderName() + " does not support the native messages API");
+    }
+
+    /**
+     * Translates an {@link EmbeddingRequest} into a provider-specific HTTP request.
+     * Only called when {@link #supportsEmbeddings()} returns true.
+     *
+     * @throws UnsupportedOperationException if this provider does not support embeddings
+     */
+    default ProviderHttpRequest translateEmbeddingRequest(
+        EmbeddingRequest request,
+        ResolvedEndpoint endpoint
+    ) throws Exception {
+        throw new UnsupportedOperationException(
+            getProviderName() + " does not support the embeddings API");
+    }
+
+    /**
+     * Translates a provider HTTP response into an {@link EmbeddingResponse}.
+     * Only called when {@link #supportsEmbeddings()} returns true.
+     *
+     * @throws UnsupportedOperationException if this provider does not support embeddings
+     */
+    default EmbeddingResponse translateEmbeddingResponse(
+        ProviderHttpResponse response
+    ) throws Exception {
+        throw new UnsupportedOperationException(
+            getProviderName() + " does not support the embeddings API");
     }
 }
