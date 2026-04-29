@@ -181,9 +181,11 @@ public class AdminHandler {
         Map<String, Object> stats = new LinkedHashMap<>();
 
         // ── Request counters ───────────────────────────────────────────────────
-        double totalRequests   = sumCounters(MetricNames.REQUESTS_TOTAL, null, null);
-        double successRequests = sumCounters(MetricNames.REQUESTS_TOTAL, MetricTags.STATUS, MetricTags.STATUS_SUCCESS);
-        double errorRequests   = sumCounters(MetricNames.REQUESTS_TOTAL, MetricTags.STATUS, MetricTags.STATUS_ERROR);
+        double totalRequests = sumCounters(MetricNames.REQUESTS_TOTAL, null, null);
+        double errorRequests = meterRegistry.find(MetricNames.REQUESTS_TOTAL).counters().stream()
+            .filter(c -> c.getId().getTag(MetricTags.ERROR_TYPE) != null)
+            .mapToDouble(c -> c.count()).sum();
+        double successRequests = totalRequests - errorRequests;
 
         stats.put("total_requests",   (long) totalRequests);
         stats.put("success_requests", (long) successRequests);
@@ -191,8 +193,8 @@ public class AdminHandler {
         stats.put("error_rate", totalRequests > 0 ? errorRequests / totalRequests : 0.0);
 
         // ── Token counters ─────────────────────────────────────────────────────
-        double inputTokens  = sumCounters(MetricNames.TOKENS_TOTAL, MetricTags.DIRECTION, MetricTags.DIRECTION_INPUT);
-        double outputTokens = sumCounters(MetricNames.TOKENS_TOTAL, MetricTags.DIRECTION, MetricTags.DIRECTION_OUTPUT);
+        double inputTokens = sumCounters(MetricNames.TOKENS_TOTAL, MetricTags.GEN_AI_TOKEN_TYPE, MetricTags.TOKEN_TYPE_INPUT);
+        double outputTokens = sumCounters(MetricNames.TOKENS_TOTAL, MetricTags.GEN_AI_TOKEN_TYPE, MetricTags.TOKEN_TYPE_OUTPUT);
         stats.put("total_input_tokens",  (long) inputTokens);
         stats.put("total_output_tokens", (long) outputTokens);
 
@@ -229,7 +231,7 @@ public class AdminHandler {
         // Group legate_requests_total counters by "provider" tag
         Map<String, Map<String, Object>> byProvider = new TreeMap<>();
         meterRegistry.find(MetricNames.REQUESTS_TOTAL).counters().forEach(c -> {
-            String provider = c.getId().getTag(MetricTags.PROVIDER);
+            String provider = c.getId().getTag(MetricTags.GEN_AI_SYSTEM);
             if (provider == null || provider.isBlank()) return;
             Map<String, Object> entry = byProvider.computeIfAbsent(provider, k -> new LinkedHashMap<>());
             long cur = ((Number) entry.getOrDefault("requests", 0L)).longValue();
@@ -237,7 +239,7 @@ public class AdminHandler {
         });
         // Add avg latency from the duration timer per provider
         meterRegistry.find(MetricNames.REQUEST_DURATION_SECONDS).timers().forEach(t -> {
-            String provider = t.getId().getTag(MetricTags.PROVIDER);
+            String provider = t.getId().getTag(MetricTags.GEN_AI_SYSTEM);
             if (provider == null || provider.isBlank()) return;
             Map<String, Object> entry = byProvider.computeIfAbsent(provider, k -> new LinkedHashMap<>());
             if (t.count() > 0) {
@@ -246,7 +248,7 @@ public class AdminHandler {
         });
         // Add estimated cost per provider
         meterRegistry.find(MetricNames.ESTIMATED_COST_USD_TOTAL).counters().forEach(c -> {
-            String provider = c.getId().getTag(MetricTags.PROVIDER);
+            String provider = c.getId().getTag(MetricTags.GEN_AI_SYSTEM);
             if (provider == null || provider.isBlank()) return;
             Map<String, Object> entry = byProvider.computeIfAbsent(provider, k -> new LinkedHashMap<>());
             double cur = ((Number) entry.getOrDefault("estimated_cost_usd", 0.0)).doubleValue();
@@ -277,7 +279,7 @@ public class AdminHandler {
     private List<Map<String, Object>> collectTopModels(int limit) {
         Map<String, Long> modelCounts = new HashMap<>();
         meterRegistry.find(MetricNames.REQUESTS_TOTAL).counters().forEach(c -> {
-            String model = c.getId().getTag(MetricTags.MODEL);
+            String model = c.getId().getTag(MetricTags.GEN_AI_REQUEST_MODEL);
             if (model == null || model.isBlank()) return;
             modelCounts.merge(model, (long) c.count(), Long::sum);
         });
