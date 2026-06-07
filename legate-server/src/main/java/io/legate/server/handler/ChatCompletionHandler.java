@@ -24,6 +24,9 @@ import io.legate.core.model.ChatCompletionResponse;
 import io.legate.core.provider.ProviderAdapter;
 import io.legate.core.provider.ProviderAdapterRegistry;
 import io.legate.core.provider.StreamContext;
+import io.legate.core.guard.GuardPipeline;
+import io.legate.core.guard.ResponseGuardContext;
+import io.legate.core.guard.ResponseGuardDecision;
 import io.legate.core.ratelimit.RateLimiter;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
@@ -50,6 +53,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 
@@ -85,11 +89,12 @@ public class ChatCompletionHandler {
     private final UpstreamClient upstreamClient;
     private final EventBus eventBus;
     private final RateLimiter rateLimiter;
-    private final LegateConfig legateConfig;
+    private volatile LegateConfig legateConfig;
     private final ResponseCache responseCache;
     private final CostCalculator costCalculator;
     private final SpendTracker spendTracker;
     private final Tracer tracer;
+    private final GuardPipeline guardPipeline;
 
     public ChatCompletionHandler(
             RequestPipeline requestPipeline,
@@ -103,7 +108,8 @@ public class ChatCompletionHandler {
             ResponseCache responseCache,
             CostCalculator costCalculator,
             SpendTracker spendTracker,
-            Tracer tracer
+            Tracer tracer,
+            GuardPipeline guardPipeline
     ) {
         this.requestPipeline = requestPipeline;
         this.objectMapper = objectMapper;
@@ -117,6 +123,14 @@ public class ChatCompletionHandler {
         this.costCalculator = costCalculator;
         this.spendTracker = spendTracker;
         this.tracer = tracer;
+        this.guardPipeline = guardPipeline;
+    }
+
+    /**
+     * Updates the running configuration for hot-reload. Called by {@link io.legate.server.config.FileWatcherConfig}.
+     */
+    public void reload(LegateConfig newConfig) {
+        this.legateConfig = newConfig;
     }
 
     /**
@@ -213,6 +227,23 @@ public class ChatCompletionHandler {
     private Mono<ServerResponse> finishWithResponse(
             RequestContext context, ChatCompletionResponse response
     ) {
+        // Run response guards (short-circuits on Block, cascades Modify)
+        if (!guardPipeline.isEmpty()) {
+            ResponseGuardContext guardCtx = new ResponseGuardContext(
+                    response, context.getEffectiveRequest(),
+                    context.getVirtualKeyInfo(), context.getRequestId());
+            List<ResponseGuardDecision> decisions = guardPipeline.executeResponse(guardCtx);
+            for (ResponseGuardDecision decision : decisions) {
+                if (decision instanceof ResponseGuardDecision.Block b) {
+                    return Mono.error(new io.legate.core.exception.GuardBlockedException(
+                            b.guardName(), b.reason()));
+                }
+                if (decision instanceof ResponseGuardDecision.Modify m) {
+                    response = m.modifiedResponse();
+                }
+            }
+        }
+
         context.setResponse(response);
         context.markUpstreamCallCompleted();
         recordPostResponseMetrics(context, response);
@@ -394,7 +425,7 @@ public class ChatCompletionHandler {
     // ── Streaming internals ───────────────────────────────────────────────────
 
     private Flux<ServerSentEvent<String>> routeAndStream(RequestContext context) {
-        FallbackChain chain = routingEngine.resolveChain(context.getEffectiveRequest().model());
+        FallbackChain chain = resolveChain(context);
         CircuitBreakerRegistry cbRegistry = routingEngine.getCircuitBreakerRegistry();
 
         Optional<FallbackChain.IndexedEndpoint> candidate = chain.getNextAvailable(0, cbRegistry);
@@ -536,10 +567,14 @@ public class ChatCompletionHandler {
      * No-op when tracing is not configured or the span is null.
      */
     private void tagCurrentSpan(String model, String requestId) {
-        if (tracer == null) return;
+        if (tracer == null) {
+            return;
+        }
         Span current = tracer.currentSpan();
-        if (current == null) return;
-        current.tag("legate.model",      model);
+        if (current == null) {
+            return;
+        }
+        current.tag("legate.model", model);
         current.tag("legate.request_id", requestId);
         current.name("legate.llm.chat_completion");
     }

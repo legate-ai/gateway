@@ -2,6 +2,7 @@ package io.legate.core.guard;
 
 import io.legate.core.context.RequestContext;
 import io.legate.core.model.ChatCompletionRequest;
+import io.legate.core.model.ChatCompletionResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,23 +118,41 @@ public class GuardPipeline {
     /**
      * Executes the response guard pipeline.
      *
+     * <p>Mirrors the request pipeline semantics: {@link ResponseGuardDecision.Block}
+     * short-circuits and is included as the last entry in the returned list.
+     * {@link ResponseGuardDecision.Modify} cascades — each subsequent guard sees
+     * the modified response.</p>
+     *
      * @param context the response guard context
-     * @return result decisions list (Reject is returned as first Block decision, or all Allow/Warn)
+     * @return all decisions up to and including the first Block (or all if no Block)
      */
     public List<ResponseGuardDecision> executeResponse(ResponseGuardContext context) {
         List<ResponseGuardDecision> decisions = new ArrayList<>();
+        ChatCompletionResponse currentResponse = context.response();
 
         for (ResponseGuard guard : responseGuards) {
             ResponseGuardDecision decision;
             try {
-                decision = guard.inspect(context);
+                ResponseGuardContext guardCtx = new ResponseGuardContext(
+                        currentResponse, context.request(),
+                        context.virtualKeyInfo(), context.requestId());
+                decision = guard.inspect(guardCtx);
             } catch (Exception e) {
-                log.error("Response guard '{}' threw unexpected exception — blocking response (fail-closed)", guard.getName(), e);
-                decision = new ResponseGuardDecision.Block(guard.getName(), "Guard threw exception: " + e.getMessage());
+                log.error("Response guard '{}' threw unexpected exception — blocking response (fail-closed)",
+                        guard.getName(), e);
+                decision = new ResponseGuardDecision.Block(
+                        guard.getName(), "Guard threw exception: " + e.getMessage());
             }
             decisions.add(decision);
-        }
 
+            switch (decision) {
+                case ResponseGuardDecision.Block ignored -> {
+                    return List.copyOf(decisions);  // short-circuit on block
+                }
+                case ResponseGuardDecision.Modify m -> currentResponse = m.modifiedResponse();
+                default -> { /* Allow, Warn — continue */ }
+            }
+        }
         return List.copyOf(decisions);
     }
 

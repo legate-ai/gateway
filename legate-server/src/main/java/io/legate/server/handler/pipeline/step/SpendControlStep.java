@@ -10,13 +10,12 @@ import io.legate.core.event.EventBus;
 import io.legate.core.event.SpendLimitBreachedEvent;
 import io.legate.core.exception.SpendLimitExceededException;
 import io.legate.core.meter.SpendTracker;
+import io.legate.core.meter.SpendTracker.BreachDetail;
 import io.legate.server.handler.pipeline.RequestPipelineStep;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
-
-import java.math.BigDecimal;
 
 /**
  * Pipeline step that enforces spend (budget) limits for the authenticated virtual key.
@@ -55,38 +54,46 @@ public class SpendControlStep implements RequestPipelineStep {
     @Override
     public void execute(ServerRequest httpRequest, RequestContext context) {
         VirtualKeyInfo keyInfo = context.getVirtualKeyInfo();
-        if (keyInfo == null || !spendTracker.isOverBudget(keyInfo.keyId())) {
+        if (keyInfo == null) {
             return;
         }
-        recordBreach(context, keyInfo.keyId());
-        applyBreachAction(keyInfo.keyId(), spendTracker.getBreachAction(keyInfo.keyId()));
+        BreachDetail breach = spendTracker.checkBudget(keyInfo.keyId());
+        if (breach == null) {
+            return;
+        }
+        recordBreach(context, keyInfo.keyId(), breach);
+        applyBreachAction(keyInfo.keyId(), breach, spendTracker.getBreachAction(keyInfo.keyId()));
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private void recordBreach(RequestContext context, String keyId) {
+    private void recordBreach(RequestContext context, String keyId, BreachDetail breach) {
         auditLog.record(AuditEvent.of(
                 context.getRequestId(),
                 keyId,
                 AuditEventType.SPEND_LIMIT_EXCEEDED,
-                "Daily spend limit exceeded for key: " + keyId));
+                breach.period().substring(0, 1).toUpperCase() + breach.period().substring(1)
+                        + " spend limit exceeded for key: " + keyId
+                        + " (current=" + breach.currentSpend() + ", limit=" + breach.limit() + ")"));
 
         eventBus.publish(new SpendLimitBreachedEvent(
                 context.getRequestId(),
                 keyId,
-                "daily",
-                spendTracker.getDailySpend(keyId),
-                null));
+                breach.period(),
+                breach.currentSpend(),
+                breach.limit()));
     }
 
-    private void applyBreachAction(String keyId, BreachAction action) {
+    private void applyBreachAction(String keyId, BreachDetail breach, BreachAction action) {
         switch (action) {
             case BLOCK -> throw new SpendLimitExceededException(
-                    keyId, "daily", spendTracker.getDailySpend(keyId), BigDecimal.ZERO);
+                    keyId, breach.period(), breach.currentSpend(), breach.limit());
             case WARN -> log.warn(
-                    "Spend limit exceeded for virtual key '{}' — proceeding (action=WARN)", keyId);
+                    "Spend limit exceeded for virtual key '{}' ({}) — proceeding (action=WARN)",
+                    keyId, breach.period());
             case LOG_ONLY -> log.info(
-                    "Spend limit exceeded for virtual key '{}' — proceeding (action=LOG_ONLY)", keyId);
+                    "Spend limit exceeded for virtual key '{}' ({}) — proceeding (action=LOG_ONLY)",
+                    keyId, breach.period());
         }
     }
 }

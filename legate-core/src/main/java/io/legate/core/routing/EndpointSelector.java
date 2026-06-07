@@ -66,11 +66,11 @@ public class EndpointSelector {
      * @param latencyTracker tracker used by the {@code LEAST_LATENCY} strategy
      */
     public EndpointSelector(
-        List<ProviderConfig> providers,
-        LoadBalancingStrategy strategy,
-        LatencyTracker latencyTracker
+            List<ProviderConfig> providers,
+            LoadBalancingStrategy strategy,
+            LatencyTracker latencyTracker
     ) {
-        this.strategy       = (strategy != null) ? strategy : LoadBalancingStrategy.ROUND_ROBIN;
+        this.strategy = (strategy != null) ? strategy : LoadBalancingStrategy.ROUND_ROBIN;
         this.latencyTracker = (latencyTracker != null) ? latencyTracker : new LatencyTracker();
         this.endpointMapRef = new AtomicReference<>(buildEndpointMap(providers));
     }
@@ -97,8 +97,8 @@ public class EndpointSelector {
         List<ResolvedEndpoint> candidates = endpointMapRef.get().get(model);
         if (candidates == null || candidates.isEmpty()) {
             throw new NoEndpointAvailableException(model,
-                "No provider configuration lists this model. " +
-                "Add it under legate.providers[].models or use an alias.");
+                    "No provider configuration lists this model. " +
+                            "Add it under legate.providers[].models or use an alias.");
         }
         if (candidates.size() == 1) {
             return candidates.get(0);
@@ -117,8 +117,8 @@ public class EndpointSelector {
     public Optional<ResolvedEndpoint> find(String model) {
         List<ResolvedEndpoint> candidates = endpointMapRef.get().get(model);
         return (candidates == null || candidates.isEmpty())
-            ? Optional.empty()
-            : Optional.of(candidates.get(0));
+                ? Optional.empty()
+                : Optional.of(candidates.get(0));
     }
 
     /**
@@ -146,7 +146,7 @@ public class EndpointSelector {
     public void reload(List<ProviderConfig> providers) {
         endpointMapRef.set(buildEndpointMap(providers));
         log.info("EndpointSelector reloaded: {} model(s) configured",
-            endpointMapRef.get().size());
+                endpointMapRef.get().size());
     }
 
     // -------------------------------------------------------------------------
@@ -208,13 +208,13 @@ public class EndpointSelector {
             ProviderCredentials credentials = resolveCredentials(provider);
             for (String model : provider.models()) {
                 ResolvedEndpoint endpoint = new ResolvedEndpoint(
-                    provider.type().adapterName(),
-                    model,
-                    provider.baseUrl(),
-                    credentials,
-                    provider.connectTimeout(),
-                    provider.readTimeout(),
-                    provider.weight()
+                        provider.type().adapterName(),
+                        model,
+                        provider.baseUrl(),
+                        credentials,
+                        provider.connectTimeout(),
+                        provider.readTimeout(),
+                        provider.weight()
                 );
                 map.computeIfAbsent(model, k -> new ArrayList<>()).add(endpoint);
             }
@@ -240,7 +240,7 @@ public class EndpointSelector {
                     yield new ProviderCredentials.ApiKeyHeader("x-api-key", apiKey);
                 }
                 log.warn("Anthropic provider '{}' has no API key configured (env var: {}).",
-                    provider.name(), provider.apiKeyEnvVar());
+                        provider.name(), provider.apiKeyEnvVar());
                 yield ProviderCredentials.None.INSTANCE;
             }
 
@@ -250,14 +250,14 @@ public class EndpointSelector {
                     yield new ProviderCredentials.BearerToken(apiKey);
                 }
                 log.warn("Provider '{}' ({}) has no API key configured (env var: {}).",
-                    provider.name(), provider.type(), provider.apiKeyEnvVar());
+                        provider.name(), provider.type(), provider.apiKeyEnvVar());
                 yield ProviderCredentials.None.INSTANCE;
             }
 
             case BEDROCK -> {
                 String accessKeyId = provider.resolvePropertyEnvVar("aws-access-key-id-env-var");
-                String secretKey   = provider.resolvePropertyEnvVar("aws-secret-access-key-env-var");
-                String region      = provider.properties().get("region");
+                String secretKey = provider.resolvePropertyEnvVar("aws-secret-access-key-env-var");
+                String region = provider.properties().get("region");
                 if (accessKeyId != null && secretKey != null && region != null) {
                     yield new ProviderCredentials.AwsSigV4(accessKeyId, secretKey, region, "bedrock");
                 }
@@ -271,7 +271,7 @@ public class EndpointSelector {
                     yield new ProviderCredentials.OAuth2(oauthToken);
                 }
                 log.warn("VertexAI provider '{}' has no service-account-key-env-var configured.",
-                    provider.name());
+                        provider.name());
                 yield ProviderCredentials.None.INSTANCE;
             }
         };

@@ -14,6 +14,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * HTTP client for calling upstream LLM providers.
@@ -24,9 +25,19 @@ public class UpstreamClient {
     private static final Logger log = LoggerFactory.getLogger(UpstreamClient.class);
 
     private final WebClient.Builder webClientBuilder;
+    private final ConcurrentHashMap<String, WebClient> clientCache = new ConcurrentHashMap<>();
 
     public UpstreamClient(WebClient.Builder webClientBuilder) {
         this.webClientBuilder = webClientBuilder;
+    }
+
+    /**
+     * Returns a cached {@link WebClient} for the given base URL, creating one on first access.
+     * Caching avoids reconstructing the Netty connection pool on every request.
+     */
+    private WebClient getOrCreateClient(String baseUrl) {
+        return clientCache.computeIfAbsent(baseUrl, url ->
+                webClientBuilder.clone().baseUrl(url).build());
     }
 
     /**
@@ -42,10 +53,7 @@ public class UpstreamClient {
     ) {
         log.debug("Sending {} request to {}", request.method(), request.url());
 
-        WebClient webClient = webClientBuilder
-            .baseUrl(request.url())
-            .defaultHeaders(headers -> request.headers().forEach((k, v) -> headers.add(k, v)))
-            .build();
+        WebClient webClient = getOrCreateClient(request.url());
 
         // Use exchangeToMono so all HTTP status codes — including 4xx/5xx — are
         // returned as ProviderHttpResponse rather than thrown as WebClientResponseException.
@@ -53,6 +61,7 @@ public class UpstreamClient {
         return webClient
             .method(org.springframework.http.HttpMethod.valueOf(request.method()))
             .uri("")
+            .headers(h -> request.headers().forEach(h::add))
             .bodyValue(request.body() != null ? request.body() : "")
             .exchangeToMono(clientResponse ->
                 clientResponse.bodyToMono(String.class)
@@ -84,20 +93,18 @@ public class UpstreamClient {
     ) {
         log.debug("Sending streaming {} request to {}", request.method(), request.url());
 
-        WebClient webClient = webClientBuilder
-            .baseUrl(request.url())
-            .defaultHeaders(headers -> {
-                request.headers().forEach((k, v) -> headers.add(k, v));
-                headers.setContentType(MediaType.APPLICATION_JSON);
-                headers.set(HttpHeaders.ACCEPT, "text/event-stream");
-            })
-            .build();
+        WebClient webClient = getOrCreateClient(request.url());
 
         // Use exchangeToFlux so error status codes are surfaced as UpstreamException
         // rather than thrown as WebClientResponseException before any data is read.
         return webClient
             .method(org.springframework.http.HttpMethod.valueOf(request.method()))
             .uri("")
+            .headers(h -> {
+                request.headers().forEach(h::add);
+                h.setContentType(MediaType.APPLICATION_JSON);
+                h.set(HttpHeaders.ACCEPT, "text/event-stream");
+            })
             .bodyValue(request.body() != null ? request.body() : "")
             .exchangeToFlux(clientResponse -> {
                 if (clientResponse.statusCode().isError()) {

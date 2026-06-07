@@ -37,7 +37,7 @@ public class Resilience4jRateLimiter implements RateLimiter {
     private static final Logger log = LoggerFactory.getLogger(Resilience4jRateLimiter.class);
     static final String GLOBAL_KEY = "__global__";
 
-    private final RateLimitingConfig config;
+    private volatile RateLimitingConfig config;
     private final RateLimiterRegistry r4jRegistry;
     private final ConcurrentHashMap<String, DailyTokenCounter> tokenCounters = new ConcurrentHashMap<>();
 
@@ -53,23 +53,33 @@ public class Resilience4jRateLimiter implements RateLimiter {
 
     @Override
     public RateLimitResult tryAcquire(String key, int estimatedTokens) {
-        // Check global limit first
-        RateLimitConfig globalCfg = config.global();
-        if (globalCfg != null && !globalCfg.isUnlimited()) {
-            RateLimitResult result = checkLimits(GLOBAL_KEY, globalCfg, estimatedTokens);
-            if (result instanceof RateLimitResult.Denied) {
-                return result;
+        // Check per-key limit FIRST — if per-key denies, global permit is never consumed
+        RateLimitConfig keyCfg = config.resolvePerKeyLimit(key);
+        if (!keyCfg.isUnlimited()) {
+            RateLimitResult keyResult = checkLimits(key, keyCfg, estimatedTokens);
+            if (keyResult instanceof RateLimitResult.Denied) {
+                return keyResult;
             }
         }
 
-        // Check per-key limit
-        RateLimitConfig keyCfg = config.resolvePerKeyLimit(key);
-        if (!keyCfg.isUnlimited()) {
-            return checkLimits(key, keyCfg, estimatedTokens);
+        // Check global limit only after per-key passes
+        RateLimitConfig globalCfg = config.global();
+        if (globalCfg != null && !globalCfg.isUnlimited()) {
+            return checkLimits(GLOBAL_KEY, globalCfg, estimatedTokens);
         }
 
         return new RateLimitResult.Allowed(Integer.MAX_VALUE, Long.MAX_VALUE,
                 Instant.now().plusSeconds(60));
+    }
+
+    /**
+     * Updates the rate-limiting configuration without restart (hot-reload support).
+     * Note: existing Resilience4j rate-limiter instances are not rebuilt; new per-key
+     * limits take effect only for virtual keys that have not yet made any request.
+     */
+    public void reload(RateLimitingConfig newConfig) {
+        this.config = newConfig != null ? newConfig : RateLimitingConfig.disabled();
+        log.info("Resilience4jRateLimiter configuration reloaded.");
     }
 
     @Override
@@ -109,18 +119,17 @@ public class Resilience4jRateLimiter implements RateLimiter {
                             rl.getMetrics().getAvailablePermissions()));
         }
 
-        // Check daily token quota (custom counter — Resilience4j does not support post-call deduction)
+        // Check daily token quota atomically — tryReserve prevents TOCTOU race
         if (cfg.hasTokenLimit()) {
             DailyTokenCounter counter = getOrCreateTokenCounter(key);
-            long used = counter.getUsed();
-            if (used + estimatedTokens > cfg.tokensPerDay()) {
+            if (!counter.tryReserve(estimatedTokens, cfg.tokensPerDay())) {
                 long secondsUntilReset = secondsUntilMidnightUtc();
                 return new RateLimitResult.Denied(
                         "Daily token limit exceeded: " + cfg.tokensPerDay()
                                 + " tokens/day for key '" + key + "'",
                         secondsUntilReset,
                         cfg.tokensPerDay(),
-                        used);
+                        counter.getUsed());
             }
         }
 
@@ -165,6 +174,21 @@ public class Resilience4jRateLimiter implements RateLimiter {
     private static final class DailyTokenCounter {
         private final AtomicLong used = new AtomicLong(0);
         private volatile LocalDate date = LocalDate.now(ZoneOffset.UTC);
+
+        /**
+         * Atomically checks whether {@code tokens} can be added without exceeding {@code limit},
+         * and if so, adds them. Returns {@code true} if the reservation succeeded.
+         * This eliminates the TOCTOU race between check and increment.
+         */
+        synchronized boolean tryReserve(long tokens, long limit) {
+            resetIfNewDay();
+            long current = used.get();
+            if (current + tokens > limit) {
+                return false;
+            }
+            used.addAndGet(tokens);
+            return true;
+        }
 
         void add(long tokens) {
             resetIfNewDay();

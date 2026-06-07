@@ -6,15 +6,13 @@ import io.legate.core.model.Message;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Comparator;
 import java.util.HexFormat;
-import java.util.List;
 
 /**
  * A normalised, hashable key for the response cache.
  *
  * <p>The key is a SHA-256 digest of the canonical request representation:
- * model + sorted messages (role + content) + temperature + topP + maxTokens
+ * model + messages (role + content, in order) + temperature + topP + maxTokens
  * + tools + toolChoice.</p>
  *
  * <p>A request is cacheable only when:</p>
@@ -51,13 +49,9 @@ public record CacheKey(String hash) {
         StringBuilder sb = new StringBuilder();
         sb.append("model=").append(chatCompletionRequest.model()).append(";");
 
-        // Sort messages for determinism (in practice order matters, but we sort for canonical form)
+        // Preserve message order — conversation order is semantically significant for LLMs
         if (chatCompletionRequest.messages() != null) {
-            List<Message> sorted = chatCompletionRequest.messages().stream()
-                .sorted(Comparator.comparing((Message m) -> m.role() == null ? "" : m.role())
-                    .thenComparing(m -> m.content() == null ? "" : m.content()))
-                .toList();
-            for (Message message : sorted) {
+            for (Message message : chatCompletionRequest.messages()) {
                 sb.append("role=").append(message.role()).append(",content=")
                   .append(message.content() == null ? "" : message.content()).append(";");
             }

@@ -7,3 +7,4 @@
 
   AI Gateway :: v${spring.application.version:0.1.0-SNAPSHOT}
   Spring Boot :: ${spring-boot.version}
+  Edition: ${legate.edition:Community}

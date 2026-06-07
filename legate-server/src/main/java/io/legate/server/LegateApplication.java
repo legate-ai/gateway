@@ -14,8 +14,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class LegateApplication {
 
-    public static void main(String[] args) {
-
+    static void main(String[] args) {
         SpringApplication.run(LegateApplication.class, args);
     }
 }

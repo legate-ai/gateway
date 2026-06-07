@@ -1,5 +1,6 @@
 package io.legate.provider.ollama;
 
+import io.legate.core.exception.UpstreamException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -78,8 +79,8 @@ public class OllamaProviderAdapter implements ProviderAdapter {
 
     @Override
     public ProviderHttpRequest translateRequest(
-        ChatCompletionRequest request,
-        ResolvedEndpoint endpoint
+            ChatCompletionRequest request,
+            ResolvedEndpoint endpoint
     ) throws Exception {
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", "application/json");
@@ -96,7 +97,9 @@ public class OllamaProviderAdapter implements ProviderAdapter {
         // Messages array — Ollama uses same role/content format as OpenAI
         body.set("messages", objectMapper.valueToTree(request.messages()));
 
-        if (request.temperature() != null) body.put("temperature", request.temperature());
+        if (request.temperature() != null) {
+            body.put("temperature", request.temperature());
+        }
         if (request.maxTokens() != null) {
             body.putObject("options").put("num_predict", request.maxTokens());
         }
@@ -109,9 +112,8 @@ public class OllamaProviderAdapter implements ProviderAdapter {
     @Override
     public ChatCompletionResponse translateResponse(ProviderHttpResponse response) throws Exception {
         if (!response.isSuccess()) {
-            throw new io.legate.core.exception.UpstreamException(
-                PROVIDER_NAME, response.statusCode(),
-                "Ollama request failed: " + response.body());
+            throw new UpstreamException(PROVIDER_NAME, response.statusCode(),
+                    "Ollama request failed: " + response.body());
         }
 
         JsonNode json = objectMapper.readTree(response.body());
@@ -119,40 +121,44 @@ public class OllamaProviderAdapter implements ProviderAdapter {
         // Ollama response format:
         // { "model": "...", "message": {"role": "assistant", "content": "..."}, "done": true,
         //   "prompt_eval_count": N, "eval_count": N }
-        String content  = "";
-        String role     = "assistant";
-        String model    = json.path("model").asText("unknown");
-        boolean done    = json.path("done").asBoolean(true);
+        String content = "";
+        String role = "assistant";
+        String model = json.path("model").asText("unknown");
+        boolean done = json.path("done").asBoolean(true);
 
         JsonNode messageNode = json.path("message");
         if (messageNode.isObject()) {
             content = messageNode.path("content").asText("");
-            role    = messageNode.path("role").asText("assistant");
+            role = messageNode.path("role").asText("assistant");
         }
 
         int promptTokens = json.path("prompt_eval_count").asInt(0);
-        int compTokens   = json.path("eval_count").asInt(0);
+        int compTokens = json.path("eval_count").asInt(0);
 
         Message msg = new Message(role, content, null, null, null);
         Choice choice = new Choice(0, msg, null, "stop", null);
         Usage usage = new Usage(promptTokens, compTokens, promptTokens + compTokens);
 
         return new ChatCompletionResponse(
-            "ollama-" + Instant.now().getEpochSecond(),
-            Instant.now().getEpochSecond(),
-            model,
-            List.of(choice),
-            usage
+                "ollama-" + Instant.now().getEpochSecond(),
+                Instant.now().getEpochSecond(),
+                model,
+                List.of(choice),
+                usage
         );
     }
 
     @Override
     public ChatCompletionChunk translateStreamChunk(String eventData, StreamContext context) throws Exception {
-        if (eventData == null || eventData.isBlank()) return null;
+        if (eventData == null || eventData.isBlank()) {
+            return null;
+        }
 
         JsonNode json = objectMapper.readTree(eventData);
-        boolean done  = json.path("done").asBoolean(false);
-        if (done) return null;
+        boolean done = json.path("done").asBoolean(false);
+        if (done) {
+            return null;
+        }
 
         String content = "";
         JsonNode messageNode = json.path("message");
@@ -163,17 +169,17 @@ public class OllamaProviderAdapter implements ProviderAdapter {
         String model = json.path("model").asText("unknown");
 
         // Build an OpenAI-compatible chunk
-        io.legate.core.model.Message delta = new Message("assistant", content, null, null, null);
-        io.legate.core.model.Choice choice = new Choice(0, null, delta, null, null);
+        Message delta = new Message("assistant", content, null, null, null);
+        Choice choice = new Choice(0, null, delta, null, null);
 
         ChatCompletionChunk chunk = new ChatCompletionChunk(
-            "ollama-stream-" + Instant.now().toEpochMilli(),
-            "chat.completion.chunk",
-            Instant.now().getEpochSecond(),
-            model,
-            List.of(choice),
-            null,
-            null
+                "ollama-stream-" + Instant.now().toEpochMilli(),
+                "chat.completion.chunk",
+                Instant.now().getEpochSecond(),
+                model,
+                List.of(choice),
+                null,
+                null
         );
         context.addChunk(chunk);
         return chunk;
@@ -181,7 +187,9 @@ public class OllamaProviderAdapter implements ProviderAdapter {
 
     @Override
     public boolean isStreamTerminator(String eventData) {
-        if (eventData == null || eventData.isBlank()) return false;
+        if (eventData == null || eventData.isBlank()) {
+            return false;
+        }
         try {
             JsonNode json = objectMapper.readTree(eventData);
             return json.path("done").asBoolean(false);

@@ -19,7 +19,7 @@ public final class MetricNames {
      * Total number of requests processed.
      * Tags: {@code provider}, {@code model}, {@code virtual_key}, {@code status}.
      */
-    public static final String REQUESTS_TOTAL = "legate_requests_total";
+    public static final String REQUESTS_TOTAL = "legate_requests";
 
     /**
      * End-to-end request duration (from received to response sent).
@@ -33,13 +33,13 @@ public final class MetricNames {
      * Cumulative token usage.
      * Tags: {@code provider}, {@code model}, {@code direction} ({@code input} or {@code output}).
      */
-    public static final String TOKENS_TOTAL = "legate_tokens_total";
+    public static final String TOKENS_TOTAL = "legate_tokens";
 
     /**
      * Cumulative estimated cost in USD.
      * Tags: {@code provider}, {@code model}, {@code virtual_key}.
      */
-    public static final String ESTIMATED_COST_USD_TOTAL = "legate_estimated_cost_usd_total";
+    public static final String ESTIMATED_COST_USD_TOTAL = "legate_estimated_cost_usd";
 
     // ── Reliability ───────────────────────────────────────────────────────────
 
@@ -47,21 +47,21 @@ public final class MetricNames {
      * Number of times a fallback provider was used.
      * Tags: {@code from_provider}, {@code to_provider}.
      */
-    public static final String FALLBACKS_TOTAL = "legate_fallbacks_total";
+    public static final String FALLBACKS_TOTAL = "legate_fallbacks";
 
     /**
      * Number of circuit-breaker state transitions.
      * Tags: {@code provider}, {@code from_state}, {@code to_state}.
      */
-    public static final String CIRCUIT_BREAKER_TRANSITIONS_TOTAL = "legate_circuit_breaker_transitions_total";
+    public static final String CIRCUIT_BREAKER_TRANSITIONS_TOTAL = "legate_circuit_breaker_transitions";
 
     // ── Cache ─────────────────────────────────────────────────────────────────
 
     /** Total cache hits across all requests. */
-    public static final String CACHE_HITS_TOTAL = "legate_cache_hits_total";
+    public static final String CACHE_HITS_TOTAL = "legate_cache_hits";
 
     /** Total cache misses across all requests. */
-    public static final String CACHE_MISSES_TOTAL = "legate_cache_misses_total";
+    public static final String CACHE_MISSES_TOTAL = "legate_cache_misses";
 
     // ── Governance ────────────────────────────────────────────────────────────
 
@@ -69,13 +69,13 @@ public final class MetricNames {
      * Number of rate-limit breaches.
      * Tags: {@code virtual_key}.
      */
-    public static final String RATE_LIMIT_BREACHES_TOTAL = "legate_rate_limit_breaches_total";
+    public static final String RATE_LIMIT_BREACHES_TOTAL = "legate_rate_limit_breaches";
 
     /**
      * Number of spend-limit breaches.
      * Tags: {@code virtual_key}, {@code limit_type}.
      */
-    public static final String SPEND_LIMIT_BREACHES_TOTAL = "legate_spend_limit_breaches_total";
+    public static final String SPEND_LIMIT_BREACHES_TOTAL = "legate_spend_limit_breaches";
 
     // ── Concurrency ───────────────────────────────────────────────────────────
 

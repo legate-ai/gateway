@@ -31,28 +31,19 @@ import static org.springframework.web.reactive.function.server.RequestPredicates
  *   <li>{@code DELETE /admin/cache}       — clear response cache</li>
  * </ul>
  */
-@Configuration
-public class LegateRouterConfig {
+@Configuration public class LegateRouterConfig {
 
     @Bean
-    public RouterFunction<ServerResponse> legateRoutes(
-            ChatCompletionHandler chatCompletionHandler,
-            ModelsHandler modelsHandler,
-            AdminHandler adminHandler
-    ) {
+    public RouterFunction<ServerResponse> legateRoutes(ChatCompletionHandler chatCompletionHandler, ModelsHandler modelsHandler, AdminHandler adminHandler) {
         return RouterFunctions
                 // ── Chat completions ──────────────────────────────────────────────
-                .route(POST("/v1/chat/completions")
-                                .and(accept(MediaType.APPLICATION_JSON)),
-                        chatCompletionHandler::handleRequest)
+                .route(POST("/v1/chat/completions").and(accept(MediaType.APPLICATION_JSON)), chatCompletionHandler::handleRequest)
 
                 // ── Model list ────────────────────────────────────────────────────
                 .andRoute(GET("/v1/models"), modelsHandler::listModels)
 
                 // ── Admin — virtual keys ──────────────────────────────────────────
-                .andRoute(POST("/admin/keys"), adminHandler::createKey)
-                .andRoute(GET("/admin/keys"), adminHandler::listKeys)
-                .andRoute(DELETE("/admin/keys/{keyId}"), adminHandler::revokeKey)
+                .andRoute(POST("/admin/keys"), adminHandler::createKey).andRoute(GET("/admin/keys"), adminHandler::listKeys).andRoute(DELETE("/admin/keys/{keyId}"), adminHandler::revokeKey)
 
                 // ── Admin — config read ───────────────────────────────────────────
                 .andRoute(GET("/admin/config"), adminHandler::getConfig)

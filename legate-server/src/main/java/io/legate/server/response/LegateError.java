@@ -32,13 +32,15 @@ import java.util.Map;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record LegateError(
-    @JsonProperty("type")               String type,
-    @JsonProperty("code")               String code,
-    @JsonProperty("message")            String message,
-    @JsonProperty("legate_request_id")  String legateRequestId,
-    @JsonProperty("details")            Map<String, Object> details
+        @JsonProperty("type") String type,
+        @JsonProperty("code") String code,
+        @JsonProperty("message") String message,
+        @JsonProperty("legate_request_id") String legateRequestId,
+        @JsonProperty("details") Map<String, Object> details
 ) {
-    /** Canonical value for the {@link #type} field in all Legate errors. */
+    /**
+     * Canonical value for the {@link #type} field in all Legate errors.
+     */
     public static final String LEGATE_ERROR_TYPE = "legate_error";
 
     /**

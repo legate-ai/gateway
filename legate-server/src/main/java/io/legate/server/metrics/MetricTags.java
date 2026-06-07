@@ -11,13 +11,19 @@ public final class MetricTags {
 
     // ── Tag keys ──────────────────────────────────────────────────────────────
 
-    /** Upstream LLM provider name (e.g., {@code openai}, {@code anthropic}). */
+    /**
+     * Upstream LLM provider name (e.g., {@code openai}, {@code anthropic}).
+     */
     public static final String PROVIDER = "provider";
 
-    /** Model name as requested by the client (e.g., {@code gpt-4o}). */
+    /**
+     * Model name as requested by the client (e.g., {@code gpt-4o}).
+     */
     public static final String MODEL = "model";
 
-    /** Virtual key ID that authenticated the request; {@code none} if unauthenticated. */
+    /**
+     * Virtual key ID that authenticated the request; {@code none} if unauthenticated.
+     */
     public static final String VIRTUAL_KEY = "virtual_key";
 
     /**
@@ -36,10 +42,14 @@ public final class MetricTags {
      */
     public static final String DIRECTION = "direction";
 
-    /** Provider that failed before the fallback was triggered. */
+    /**
+     * Provider that failed before the fallback was triggered.
+     */
     public static final String FROM_PROVIDER = "from_provider";
 
-    /** Provider that served the request after a fallback. */
+    /**
+     * Provider that served the request after a fallback.
+     */
     public static final String TO_PROVIDER = "to_provider";
 
     /**
@@ -48,30 +58,46 @@ public final class MetricTags {
      */
     public static final String LIMIT_TYPE = "limit_type";
 
-    /** Circuit breaker state before a transition. */
+    /**
+     * Circuit breaker state before a transition.
+     */
     public static final String FROM_STATE = "from_state";
 
-    /** Circuit breaker state after a transition. */
+    /**
+     * Circuit breaker state after a transition.
+     */
     public static final String TO_STATE = "to_state";
 
     // ── Tag values ────────────────────────────────────────────────────────────
 
-    /** {@link #STATUS} value for successfully completed requests. */
+    /**
+     * {@link #STATUS} value for successfully completed requests.
+     */
     public static final String STATUS_SUCCESS = "success";
 
-    /** {@link #STATUS} value for failed requests (any error). */
+    /**
+     * {@link #STATUS} value for failed requests (any error).
+     */
     public static final String STATUS_ERROR = "error";
 
-    /** {@link #DIRECTION} value for prompt/input tokens. */
+    /**
+     * {@link #DIRECTION} value for prompt/input tokens.
+     */
     public static final String DIRECTION_INPUT = "input";
 
-    /** {@link #DIRECTION} value for completion/output tokens. */
+    /**
+     * {@link #DIRECTION} value for completion/output tokens.
+     */
     public static final String DIRECTION_OUTPUT = "output";
 
-    /** Fallback value used when a tag value is absent or unknown. */
+    /**
+     * Fallback value used when a tag value is absent or unknown.
+     */
     public static final String UNKNOWN = "unknown";
 
-    /** Fallback value for {@link #VIRTUAL_KEY} when no key authenticated the request. */
+    /**
+     * Fallback value for {@link #VIRTUAL_KEY} when no key authenticated the request.
+     */
     public static final String NONE = "none";
 
     private MetricTags() {

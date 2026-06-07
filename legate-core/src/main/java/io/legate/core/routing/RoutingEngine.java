@@ -43,6 +43,7 @@ public class RoutingEngine {
     private final AtomicReference<String> defaultChainNameRef;
     private final AtomicReference<Map<String, ProviderConfig>> providerMapRef;
     private final AtomicReference<RouteRuleMatcher> ruleMatcherRef;
+    private final AtomicReference<Map<String, String>> modelChainIndexRef;
     private final CircuitBreakerRegistry cbRegistry;
     private final LatencyTracker latencyTracker;
 
@@ -70,7 +71,9 @@ public class RoutingEngine {
         this.endpointSelectorRef = new AtomicReference<>(
             new EndpointSelector(config.providers(), lbStrategy, this.latencyTracker));
         this.cbRegistry = new CircuitBreakerRegistry(config.routing().circuitBreaker(), eventBus);
-        this.chainsRef = new AtomicReference<>(buildChains(config, providerMap));
+        Map<String, FallbackChain> initialChains = buildChains(config, providerMap);
+        this.chainsRef = new AtomicReference<>(initialChains);
+        this.modelChainIndexRef = new AtomicReference<>(buildModelChainIndex(initialChains));
         this.defaultChainNameRef = new AtomicReference<>(config.routing().defaultChain());
         this.ruleMatcherRef = new AtomicReference<>(buildRuleMatcher(config));
 
@@ -136,23 +139,37 @@ public class RoutingEngine {
      * @return the resolved chain; never null
      */
     public FallbackChain resolveChain(String modelOrAlias) {
-        String defaultChainName = defaultChainNameRef.get();
+        // 1. Resolve alias to canonical model name first
+        String canonicalModel = aliasResolverRef.get().resolve(modelOrAlias);
         Map<String, FallbackChain> chains = chainsRef.get();
 
-        // 1. Try the configured default chain
-        FallbackChain chain = chains.get(defaultChainName);
-        if (chain != null && !chain.isEmpty()) {
-            return chain;
+        // 2. Look for a chain that explicitly serves this canonical model
+        String matchedChainName = modelChainIndexRef.get().get(canonicalModel);
+        if (matchedChainName != null) {
+            FallbackChain chain = chains.get(matchedChainName);
+            if (chain != null && !chain.isEmpty()) {
+                log.debug("Resolved '{}' → canonical='{}' → chain '{}'",
+                        modelOrAlias, canonicalModel, matchedChainName);
+                return chain;
+            }
         }
 
-        // 2. Synthetic chain from direct model lookup
-        String canonicalModel = aliasResolverRef.get().resolve(modelOrAlias);
+        // 3. Fall back to configured default chain
+        String defaultChainName = defaultChainNameRef.get();
+        FallbackChain defaultChain = chains.get(defaultChainName);
+        if (defaultChain != null && !defaultChain.isEmpty()) {
+            log.debug("Resolved '{}' → canonical='{}' → default chain '{}'",
+                    modelOrAlias, canonicalModel, defaultChainName);
+            return defaultChain;
+        }
+
+        // 4. Synthetic single-endpoint chain from direct model lookup
         Optional<ResolvedEndpoint> ep = endpointSelectorRef.get().find(canonicalModel);
         if (ep.isPresent()) {
             return FallbackChain.single("direct:" + canonicalModel, ep.get());
         }
 
-        // 3. Nothing found
+        // 5. Nothing found
         return FallbackChain.empty("none:" + modelOrAlias);
     }
 
@@ -204,7 +221,9 @@ public class RoutingEngine {
         // Replace EndpointSelector to pick up new strategy/providers from the updated config
         LoadBalancingStrategy lbStrategy = newConfig.routing().loadBalancer().strategy();
         endpointSelectorRef.set(new EndpointSelector(newConfig.providers(), lbStrategy, latencyTracker));
-        chainsRef.set(buildChains(newConfig, providerMap));
+        Map<String, FallbackChain> reloadedChains = buildChains(newConfig, providerMap);
+        chainsRef.set(reloadedChains);
+        modelChainIndexRef.set(buildModelChainIndex(reloadedChains));
         defaultChainNameRef.set(newConfig.routing().defaultChain());
         ruleMatcherRef.set(buildRuleMatcher(newConfig));
         log.info("RoutingEngine reloaded: {} provider(s), {} model(s), {} chain(s), default-chain='{}'",
@@ -271,13 +290,13 @@ public class RoutingEngine {
     }
 
     private static Map<String, ProviderConfig> buildProviderMap(LegateConfig config) {
-        Map<String, ProviderConfig> map = new HashMap<>();
+        Map<String, ProviderConfig> providerConfigMap = new HashMap<>();
         if (config.providers() != null) {
-            for (ProviderConfig p : config.providers()) {
-                map.put(p.name(), p);
+            for (ProviderConfig providerConfig : config.providers()) {
+                providerConfigMap.put(providerConfig.name(), providerConfig);
             }
         }
-        return Map.copyOf(map);
+        return Map.copyOf(providerConfigMap);
     }
 
     private static Map<String, FallbackChain> buildChains(
@@ -295,5 +314,19 @@ public class RoutingEngine {
                     FallbackChain.from(entry.getKey(), entry.getValue(), providerMap));
         }
         return Map.copyOf(chains);
+    }
+
+    /**
+     * Builds an index of model name → chain name for O(1) model-to-chain lookup.
+     * When the same model appears in multiple chains, the first chain encountered wins.
+     */
+    private static Map<String, String> buildModelChainIndex(Map<String, FallbackChain> chains) {
+        Map<String, String> index = new HashMap<>();
+        for (Map.Entry<String, FallbackChain> entry : chains.entrySet()) {
+            for (ResolvedEndpoint ep : entry.getValue().endpoints()) {
+                index.putIfAbsent(ep.modelName(), entry.getKey());
+            }
+        }
+        return Map.copyOf(index);
     }
 }
