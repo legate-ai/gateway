@@ -1,6 +1,6 @@
 # Legate AI Gateway
 
-[![CI](https://github.com/legate-ai/legate/actions/workflows/ci.yml/badge.svg)](https://github.com/legate-ai/legate/actions)
+[![CI](https://github.com/legate-ai/gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/legate-ai/legate/actions)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.3-brightgreen.svg)](https://spring.io/projects/spring-boot)
@@ -8,12 +8,12 @@
 Legate is an open-source AI gateway that allows route, govern, and observe all LLM traffic through a single control point. 
 It sits between your applications and LLM providers (OpenAI, Anthropic, Azure, AWS Bedrock, Google Vertex AI), providing:
 
-- **Unified OpenAI-compatible API** — One interface for all providers
-- **Intelligent Routing** — Fallback chains, load balancing, circuit breakers
-- **Content Governance** — PII detection, keyword filtering, prompt injection protection
-- **Observability** — Request logging, metrics, tracing, cost tracking
-- **Security** — Virtual keys, rate limiting, spend controls, model access control
-- **High Performance** — Built on WebFlux + Virtual Threads
+- **Unified OpenAI-compatible API**: One interface for all providers
+- **Intelligent Routing**: Fallback chains, load balancing, circuit breakers
+- **Content Governance**: PII detection, keyword filtering, prompt injection protection
+- **Observability**: Request logging, metrics, tracing, cost tracking
+- **Security**: Virtual keys, rate limiting, spend controls, model access control
+- **High Performance**: Built on WebFlux + Virtual Threads
 
 ## Quick Start
 
@@ -75,45 +75,6 @@ curl -X POST http://localhost:8080/v1/chat/completions \
     "stream": true
   }'
 ```
-
-## Features
-
-### Phase 1
-
-- [x] Unified OpenAI-compatible API
-- [x] Provider adapters: OpenAI, Anthropic
-- [x] Streaming support (SSE)
-- [x] Request/response translation
-- [x] Structured JSON logging
-- [x] Docker containerization
-- [x] Health endpoints
-
-### Phase 2
-
-- [ ] Fallback chains with automatic retry
-- [ ] Circuit breakers for provider health
-- [ ] Load balancing (round-robin, weighted, least-latency)
-- [ ] Virtual key authentication
-- [ ] Rate limiting (requests/min, tokens/day)
-- [ ] Configuration hot-reload
-- [ ] Additional providers: Azure, Bedrock, Vertex AI, Ollama
-
-### Phase 3
-
-- [ ] Content guards (PII detection, keyword filtering)
-- [ ] Spend tracking and limits
-- [ ] Model access control
-- [ ] Audit logging
-- [ ] Response caching
-- [ ] Prometheus metrics
-
-### Phase 4
-
-- [ ] Redis for distributed caching and rate limiting
-- [ ] PostgreSQL for audit logs and virtual keys
-- [ ] OpenTelemetry distributed tracing
-- [ ] Kubernetes Helm chart
-- [ ] SDK
 
 ## Architecture
 
@@ -205,16 +166,6 @@ gateway/
 └── legate-bom/                  # Bill of Materials
 ```
 
-## Provider Support
-
-| Provider | Status | Streaming | Authentication |
-|----------|--------|-----------|----------------|
-| OpenAI | ✅ | ✅ | Bearer token |
-| Anthropic | ✅ | ✅ | API key header |
-| Azure OpenAI | 🚧 Phase 2 | | |
-| AWS Bedrock | 🚧 Phase 2 | | |
-| Google Vertex AI | 🚧 Phase 2 | | |
-| Ollama (local) | 🚧 Phase 2 | | |
 
 ## Contributing
 
