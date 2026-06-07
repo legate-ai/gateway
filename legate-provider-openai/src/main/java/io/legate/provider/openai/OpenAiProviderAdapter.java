@@ -4,6 +4,9 @@ import tools.jackson.databind.ObjectMapper;
 import io.legate.core.model.ChatCompletionChunk;
 import io.legate.core.model.ChatCompletionRequest;
 import io.legate.core.model.ChatCompletionResponse;
+import io.legate.core.exception.UpstreamException;
+import io.legate.core.model.EmbeddingRequest;
+import io.legate.core.model.EmbeddingResponse;
 import io.legate.core.provider.ProviderAdapter;
 import io.legate.core.provider.ProviderHttpRequest;
 import io.legate.core.provider.ProviderHttpResponse;
@@ -57,9 +60,7 @@ public class OpenAiProviderAdapter implements ProviderAdapter {
             return true;
         }
 
-        // If no specific provider adapter claims it, default to OpenAI compatibility
-        // This allows OpenAI-compatible endpoints (vLLM, LMStudio, etc.)
-        return true;
+        return false;
     }
 
     @Override
@@ -91,7 +92,7 @@ public class OpenAiProviderAdapter implements ProviderAdapter {
         if (!response.isSuccess()) {
             log.error("OpenAI returned error status: {} - {}",
                 response.statusCode(), response.body());
-            throw new RuntimeException("OpenAI API error: " + response.statusCode());
+            throw new UpstreamException(PROVIDER_NAME, response.statusCode(), response.body());
         }
 
         // OpenAI response is already in the unified format
@@ -118,6 +119,40 @@ public class OpenAiProviderAdapter implements ProviderAdapter {
     @Override
     public boolean isStreamTerminator(String eventData) {
         return eventData != null && eventData.trim().equals(STREAM_TERMINATOR);
+    }
+
+    @Override
+    public boolean supportsEmbeddings() {
+        return true;
+    }
+
+    @Override
+    public ProviderHttpRequest translateEmbeddingRequest(
+        EmbeddingRequest request,
+        ResolvedEndpoint endpoint
+    ) throws Exception {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json");
+        addAuthenticationHeader(headers, endpoint.credentials());
+        String url = buildEmbeddingUrl(endpoint.baseUrl());
+        String body = objectMapper.writeValueAsString(request);
+        return ProviderHttpRequest.post(url, headers, body);
+    }
+
+    @Override
+    public EmbeddingResponse translateEmbeddingResponse(ProviderHttpResponse response) throws Exception {
+        if (!response.isSuccess()) {
+            throw new UpstreamException(PROVIDER_NAME, response.statusCode(), response.body());
+        }
+        return objectMapper.readValue(response.body(), EmbeddingResponse.class);
+    }
+
+    private String buildEmbeddingUrl(String baseUrl) {
+        String url = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        if (!url.contains("/embeddings")) {
+            url = url + "/v1/embeddings";
+        }
+        return url;
     }
 
     /**

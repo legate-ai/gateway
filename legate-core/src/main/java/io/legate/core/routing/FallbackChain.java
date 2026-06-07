@@ -134,6 +134,28 @@ public class FallbackChain {
     }
 
     /**
+     * Returns an endpoint selected by consistent hash of {@code stickyKey}, skipping
+     * circuit-breaker-open endpoints. Falls back to {@link #getNextAvailable(int, CircuitBreakerRegistry)}
+     * if the hashed endpoint is blocked.
+     *
+     * @param stickyKey  value to hash (e.g., a conversation ID header value)
+     * @param cbRegistry circuit breaker registry; may be null
+     * @return the consistently selected endpoint, or fallback if blocked
+     */
+    public Optional<IndexedEndpoint> getSticky(String stickyKey, CircuitBreakerRegistry cbRegistry) {
+        if (endpoints.isEmpty()) {
+            return Optional.empty();
+        }
+        int preferred = Math.abs(stickyKey.hashCode()) % endpoints.size();
+        ResolvedEndpoint ep = endpoints.get(preferred);
+        if (cbRegistry == null || cbRegistry.isCallPermitted(ep)) {
+            return Optional.of(new IndexedEndpoint(preferred, ep));
+        }
+        // Preferred endpoint is blocked — fall back to round-robin from start
+        return getNextAvailable(0, cbRegistry);
+    }
+
+    /**
      * Returns the total number of endpoints in this chain.
      */
     public int size() {

@@ -36,11 +36,22 @@ public interface RateLimiter {
     /**
      * Reports actual token usage after a successful upstream call.
      *
-     * <p>Implementations should deduct the actual token count from the token quota,
-     * adjusting for any earlier estimated pre-reservation.</p>
-     *
      * @param key          the rate-limit key
      * @param actualTokens actual tokens consumed (prompt + completion)
      */
     void reportUsage(String key, int actualTokens);
+
+    /**
+     * Adjusts a pre-reservation made during {@link #tryAcquire} to the actual usage.
+     * The net change applied to the token bucket is {@code actualTokens - reservedTokens}.
+     *
+     * @param key            the rate-limit key
+     * @param reservedTokens tokens reserved during {@code tryAcquire} (from {@link RateLimitResult.Allowed#reservedTokens()})
+     * @param actualTokens   actual tokens consumed
+     */
+    default void reportUsage(String key, int reservedTokens, int actualTokens) {
+        // Default: ignore the reservation, just record actual usage.
+        // Override in implementations that pre-reserve.
+        reportUsage(key, actualTokens);
+    }
 }

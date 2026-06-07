@@ -44,10 +44,11 @@ class OpenAiProviderAdapterTest {
     }
 
     @Test
-    void shouldSupportOpenAiCompatibleModels() {
-        // Should default to true for unknown models (OpenAI-compatible)
-        assertThat(adapter.supports("llama-3-70b")).isTrue();
-        assertThat(adapter.supports("custom-model")).isTrue();
+    void shouldNotSupportUnknownModels() {
+        // Unknown/non-OpenAI models must not be caught by this adapter
+        assertThat(adapter.supports("llama-3-70b")).isFalse();
+        assertThat(adapter.supports("custom-model")).isFalse();
+        assertThat(adapter.supports("claude-3-opus")).isFalse();
     }
 
     @Test

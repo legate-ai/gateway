@@ -35,6 +35,8 @@ public class RequestContext {
     private Usage usage;
     private BigDecimal estimatedCostUsd;
     private String errorCode;
+    private int reservedTokens;
+    private String stickyKey;
 
     public RequestContext(String requestId) {
         this.requestId = requestId;
@@ -186,5 +188,21 @@ public class RequestContext {
 
     public void setErrorCode(String errorCode) {
         this.errorCode = errorCode;
+    }
+
+    public int getReservedTokens() {
+        return reservedTokens;
+    }
+
+    public void setReservedTokens(int reservedTokens) {
+        this.reservedTokens = reservedTokens;
+    }
+
+    public String getStickyKey() {
+        return stickyKey;
+    }
+
+    public void setStickyKey(String stickyKey) {
+        this.stickyKey = stickyKey;
     }
 }

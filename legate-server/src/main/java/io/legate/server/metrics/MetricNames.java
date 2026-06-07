@@ -1,88 +1,63 @@
 package io.legate.server.metrics;
 
 /**
- * Micrometer metric name constants for all Legate instrumentation.
+ * Metric name constants aligned with the OpenTelemetry GenAI semantic conventions
+ * (https://opentelemetry.io/docs/specs/semconv/gen-ai/).
  *
- * <p>Used by both {@link MetricsCollector} (where metrics are registered)
- * and {@code AdminHandler} (where metrics are queried for the stats API).
- * Keeping them in one place eliminates drift between registration and query.</p>
+ * <p>Micrometer translates dot-separated names to the format required by each
+ * registry (e.g., dots → underscores for Prometheus).</p>
  *
- * <p>Alert condition YAML also references these names under
- * {@code legate.alerts[].condition}; see {@code AlertMetricNames} for the
- * alert-specific subset.</p>
+ * <p>Note: the OTel spec defines {@code gen_ai.client.token.usage} and
+ * {@code gen_ai.client.operation.duration} as histograms. This implementation
+ * currently uses counters/timers; migrate to histograms when upgrading to
+ * Micrometer's distribution-summary support.</p>
  */
 public final class MetricNames {
 
     // ── Request lifecycle ─────────────────────────────────────────────────────
 
-    /**
-     * Total number of requests processed.
-     * Tags: {@code provider}, {@code model}, {@code virtual_key}, {@code status}.
-     */
-    public static final String REQUESTS_TOTAL = "legate_requests";
+    /** Total completed operations (counter). Tags: gen_ai.system, gen_ai.request.model, gen_ai.operation.name, error.type. */
+    public static final String REQUESTS_TOTAL = "gen_ai.client.requests";
 
-    /**
-     * End-to-end request duration (from received to response sent).
-     * Tags: {@code provider}, {@code model}.
-     */
-    public static final String REQUEST_DURATION_SECONDS = "legate_request_duration_seconds";
+    /** End-to-end operation duration (timer). Tags: gen_ai.system, gen_ai.request.model, gen_ai.operation.name. */
+    public static final String REQUEST_DURATION_SECONDS = "gen_ai.client.operation.duration";
 
     // ── Token accounting ──────────────────────────────────────────────────────
 
-    /**
-     * Cumulative token usage.
-     * Tags: {@code provider}, {@code model}, {@code direction} ({@code input} or {@code output}).
-     */
-    public static final String TOKENS_TOTAL = "legate_tokens";
+    /** Cumulative token usage (counter). Tags: gen_ai.system, gen_ai.request.model, gen_ai.token.type. */
+    public static final String TOKENS_TOTAL = "gen_ai.client.token.usage";
 
-    /**
-     * Cumulative estimated cost in USD.
-     * Tags: {@code provider}, {@code model}, {@code virtual_key}.
-     */
-    public static final String ESTIMATED_COST_USD_TOTAL = "legate_estimated_cost_usd";
+    /** Cumulative estimated cost in USD (counter). Tags: gen_ai.system, gen_ai.request.model, virtual_key. */
+    public static final String ESTIMATED_COST_USD_TOTAL = "gen_ai.client.cost.usd";
 
     // ── Reliability ───────────────────────────────────────────────────────────
 
-    /**
-     * Number of times a fallback provider was used.
-     * Tags: {@code from_provider}, {@code to_provider}.
-     */
-    public static final String FALLBACKS_TOTAL = "legate_fallbacks";
+    /** Fallback events (counter). Tags: gen_ai.system.from, gen_ai.system.to. */
+    public static final String FALLBACKS_TOTAL = "gen_ai.client.fallbacks";
 
-    /**
-     * Number of circuit-breaker state transitions.
-     * Tags: {@code provider}, {@code from_state}, {@code to_state}.
-     */
-    public static final String CIRCUIT_BREAKER_TRANSITIONS_TOTAL = "legate_circuit_breaker_transitions";
+    /** Circuit breaker state transitions (counter). Tags: gen_ai.system, from_state, to_state. */
+    public static final String CIRCUIT_BREAKER_TRANSITIONS_TOTAL = "gen_ai.client.circuit_breaker.transitions";
 
     // ── Cache ─────────────────────────────────────────────────────────────────
 
-    /** Total cache hits across all requests. */
-    public static final String CACHE_HITS_TOTAL = "legate_cache_hits";
+    /** Total cache hits (counter). */
+    public static final String CACHE_HITS_TOTAL = "gen_ai.client.cache.hits";
 
-    /** Total cache misses across all requests. */
-    public static final String CACHE_MISSES_TOTAL = "legate_cache_misses";
+    /** Total cache misses (counter). */
+    public static final String CACHE_MISSES_TOTAL = "gen_ai.client.cache.misses";
 
     // ── Governance ────────────────────────────────────────────────────────────
 
-    /**
-     * Number of rate-limit breaches.
-     * Tags: {@code virtual_key}.
-     */
-    public static final String RATE_LIMIT_BREACHES_TOTAL = "legate_rate_limit_breaches";
+    /** Rate-limit breaches (counter). Tags: virtual_key. */
+    public static final String RATE_LIMIT_BREACHES_TOTAL = "gen_ai.client.rate_limit.breaches";
 
-    /**
-     * Number of spend-limit breaches.
-     * Tags: {@code virtual_key}, {@code limit_type}.
-     */
-    public static final String SPEND_LIMIT_BREACHES_TOTAL = "legate_spend_limit_breaches";
+    /** Spend-limit breaches (counter). Tags: virtual_key, limit_type. */
+    public static final String SPEND_LIMIT_BREACHES_TOTAL = "gen_ai.client.spend_limit.breaches";
 
     // ── Concurrency ───────────────────────────────────────────────────────────
 
-    /** Gauge tracking the number of in-flight requests at any given moment. */
-    public static final String ACTIVE_REQUESTS = "legate_active_requests";
+    /** Gauge of in-flight requests. */
+    public static final String ACTIVE_REQUESTS = "gen_ai.client.active_requests";
 
-    private MetricNames() {
-        // constants class — no instances
-    }
+    private MetricNames() {}
 }

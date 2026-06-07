@@ -1,7 +1,7 @@
 plugins {
     java
     jacoco
-    id("org.springframework.boot") version "4.0.5" apply false
+    id("org.springframework.boot") version "4.0.6" apply false
     id("io.spring.dependency-management") version "1.1.6" apply false
 }
 
@@ -33,7 +33,6 @@ subprojects {
         options.encoding = "UTF-8"
         options.compilerArgs.addAll(
             listOf(
-                "--enable-preview",
                 "-parameters"
             )
         )
@@ -43,13 +42,11 @@ subprojects {
         isFailOnError = false
         val opts = options as StandardJavadocDocletOptions
         opts.addStringOption("source", "25")
-        opts.addBooleanOption("-enable-preview", true)  // generates --enable-preview
         opts.quiet()
     }
 
     tasks.withType<Test> {
         useJUnitPlatform()
-        jvmArgs("--enable-preview")
 
         testLogging {
             events("passed", "skipped", "failed")

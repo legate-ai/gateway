@@ -1,9 +1,1 @@
-keys:
-  - key-id: wdn_key_04b749a67db45c77
-    team-name: 'team-alpha'
-    key-hash: sha256:3baf657313ac2301d7176dac9b98a4bffccc0dfc5a9271e7b390c35660568117
-    key-prefix: wdn_live_GEf...
-    created-at: 2026-03-05T20:50:18.803156500Z
-    revoked: true
-    allowed-models: [gpt-*, claude-*]
-    denied-models: []
+keys: []

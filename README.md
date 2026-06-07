@@ -1,6 +1,6 @@
 # Legate AI Gateway
 
-[![CI](https://github.com/legate-ai/legate/actions/workflows/ci.yml/badge.svg)](https://github.com/legate-ai/legate/actions)
+[![CI](https://github.com/legate-ai/gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/legate-ai/legate/actions)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.3-brightgreen.svg)](https://spring.io/projects/spring-boot)
@@ -8,12 +8,12 @@
 Legate is an open-source AI gateway that allows route, govern, and observe all LLM traffic through a single control point. 
 It sits between your applications and LLM providers (OpenAI, Anthropic, Azure, AWS Bedrock, Google Vertex AI), providing:
 
-- **Unified OpenAI-compatible API** — One interface for all providers
-- **Intelligent Routing** — Fallback chains, load balancing, circuit breakers
-- **Content Governance** — PII detection, keyword filtering, prompt injection protection
-- **Observability** — Request logging, metrics, tracing, cost tracking
-- **Security** — Virtual keys, rate limiting, spend controls, model access control
-- **High Performance** — Built on WebFlux + Virtual Threads
+- **Unified OpenAI-compatible API**: One interface for all providers
+- **Intelligent Routing**: Fallback chains, load balancing, circuit breakers
+- **Content Governance**: PII detection, keyword filtering, prompt injection protection
+- **Observability**: Request logging, metrics, tracing, cost tracking
+- **Security**: Virtual keys, rate limiting, spend controls, model access control
+- **High Performance**: Built on WebFlux + Virtual Threads
 
 ## Quick Start
 
@@ -35,8 +35,8 @@ docker run -p 8080:8080 \
 
 ```bash
 # Clone the repository
-git clone https://github.com/legate-ai/legate.git
-cd legate
+git clone https://github.com/legate-ai/gateway.git
+cd gateway
 
 # Build
 ./gradlew build
@@ -76,45 +76,6 @@ curl -X POST http://localhost:8080/v1/chat/completions \
   }'
 ```
 
-## Features
-
-### Phase 1 (v0.1.0) — "It Works" ✅
-
-- [x] Unified OpenAI-compatible API
-- [x] Provider adapters: OpenAI, Anthropic
-- [x] Streaming support (SSE)
-- [x] Request/response translation
-- [x] Structured JSON logging
-- [x] Docker containerization
-- [x] Health endpoints
-
-### Phase 2 (v0.2.0) — "It's Reliable" (Coming Soon)
-
-- [ ] Fallback chains with automatic retry
-- [ ] Circuit breakers for provider health
-- [ ] Load balancing (round-robin, weighted, least-latency)
-- [ ] Virtual key authentication
-- [ ] Rate limiting (requests/min, tokens/day)
-- [ ] Configuration hot-reload
-- [ ] Additional providers: Azure, Bedrock, Vertex AI, Ollama
-
-### Phase 3 (v0.3.0) — "It's Governed" (Planned)
-
-- [ ] Content guards (PII detection, keyword filtering)
-- [ ] Spend tracking and limits
-- [ ] Model access control
-- [ ] Audit logging
-- [ ] Response caching
-- [ ] Prometheus metrics
-
-### Phase 4 (v0.4.0) — "It Scales" (Planned)
-
-- [ ] Redis for distributed caching and rate limiting
-- [ ] PostgreSQL for audit logs and virtual keys
-- [ ] OpenTelemetry distributed tracing
-- [ ] Kubernetes Helm chart
-- [ ] Embedded mode (Spring Boot Starter)
-
 ## Architecture
 
 ```
@@ -128,10 +89,10 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 │       Legate Gateway            │
 │  ┌───────────────────────────┐  │
 │  │  Request Pipeline         │  │
-│  │  • Auth (Phase 2)         │  │
-│  │  • Rate Limit (Phase 2)   │  │
-│  │  • Guards (Phase 3)       │  │
-│  │  • Cache (Phase 3)        │  │
+│  │  • Auth                   │  │
+│  │  • Rate Limit             │  │
+│  │  • Guards                 │  │
+│  │  • Cache                  │  │
 │  │  • Routing Engine         │  │
 │  └───────────────────────────┘  │
 └────────┬──────────┬─────────────┘
@@ -163,14 +124,12 @@ ANTHROPIC_API_KEY=sk-ant-...
 SERVER_PORT=8080
 ```
 
-Phase 2+ will support full YAML configuration with hot-reload.
-
 ## Development
 
 ### Prerequisites
 
 - Java 25 (Eclipse Temurin recommended)
-- Gradle 8.12+ (included via wrapper)
+- Gradle 9.0.0 (included via wrapper)
 - Docker (for containerization)
 
 ### Build Commands
@@ -198,7 +157,7 @@ docker compose -f docker/docker-compose.yml up
 ### Project Structure
 
 ```
-legate/
+gateway/
 ├── legate-core/                 # Core domain logic (zero Spring dependency)
 ├── legate-provider-openai/      # OpenAI adapter
 ├── legate-provider-anthropic/   # Anthropic adapter
@@ -207,23 +166,6 @@ legate/
 └── legate-bom/                  # Bill of Materials
 ```
 
-## Provider Support
-
-| Provider | Status | Streaming | Authentication |
-|----------|--------|-----------|----------------|
-| OpenAI | ✅ | ✅ | Bearer token |
-| Anthropic | ✅ | ✅ | API key header |
-| Azure OpenAI | 🚧 Phase 2 | | |
-| AWS Bedrock | 🚧 Phase 2 | | |
-| Google Vertex AI | 🚧 Phase 2 | | |
-| Ollama (local) | 🚧 Phase 2 | | |
-
-## Performance
-
-Phase 1 benchmarks (coming soon):
-- **Latency overhead:** <5ms p50, <15ms p99
-- **Throughput:** 10,000+ req/sec (non-streaming)
-- **Memory:** ~512MB baseline
 
 ## Contributing
 
@@ -244,9 +186,9 @@ Apache License 2.0 — see [LICENSE](LICENSE) for details.
 
 ## Community
 
-- **GitHub:** [github.com/legate-ai/legate](https://github.com/legate-ai/legate)
-- **Issues:** [Report bugs and request features](https://github.com/legate-ai/legate/issues)
-- **Discussions:** [Join the conversation](https://github.com/legate-ai/legate/discussions)
+- **GitHub:** [github.com/legate-ai/legate](https://github.com/legate-ai/gateway)
+- **Issues:** [Report bugs and request features](https://github.com/legate-ai/gateway/issues)
+- **Discussions:** [Join the conversation](https://github.com/legate-ai/gateway/discussions)
 
 ---
 

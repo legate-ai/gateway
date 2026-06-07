@@ -70,48 +70,50 @@ public class MetricsCollector {
 
     private void onCompletion(CompletionEvent event) {
         try {
-            String provider = StringUtils.defaultIfBlank(event.provider(), MetricTags.UNKNOWN);
+            String system = StringUtils.defaultIfBlank(event.provider(), MetricTags.UNKNOWN);
             String model = StringUtils.defaultIfBlank(event.requestedModel(), MetricTags.UNKNOWN);
             String virtualKey = StringUtils.defaultIfBlank(event.virtualKeyId(), MetricTags.NONE);
-            String status = event.success() ? MetricTags.STATUS_SUCCESS : MetricTags.STATUS_ERROR;
+            String errorType = event.success() ? null : MetricTags.UNKNOWN;
 
             Counter.builder(MetricNames.REQUESTS_TOTAL)
-                    .tag(MetricTags.PROVIDER, provider)
-                    .tag(MetricTags.MODEL, model)
-                    .tag(MetricTags.VIRTUAL_KEY, virtualKey)
-                    .tag(MetricTags.STATUS, status)
-                    .register(registry)
-                    .increment();
+                .tag(MetricTags.GEN_AI_SYSTEM, system)
+                .tag(MetricTags.GEN_AI_REQUEST_MODEL, model)
+                .tag(MetricTags.GEN_AI_OPERATION, "chat")
+                .tag(MetricTags.VIRTUAL_KEY, virtualKey)
+                .tags(errorType != null ? new String[]{MetricTags.ERROR_TYPE, errorType} : new String[0])
+                .register(registry)
+                .increment();
 
             Timer.builder(MetricNames.REQUEST_DURATION_SECONDS)
-                    .tag(MetricTags.PROVIDER, provider)
-                    .tag(MetricTags.MODEL, model)
-                    .register(registry)
-                    .record(Duration.ofMillis(event.totalLatencyMs()));
+                .tag(MetricTags.GEN_AI_SYSTEM, system)
+                .tag(MetricTags.GEN_AI_REQUEST_MODEL, model)
+                .tag(MetricTags.GEN_AI_OPERATION, "chat")
+                .register(registry)
+                .record(Duration.ofMillis(event.totalLatencyMs()));
 
             if (event.inputTokens() != null) {
                 Counter.builder(MetricNames.TOKENS_TOTAL)
-                        .tag(MetricTags.PROVIDER, provider)
-                        .tag(MetricTags.MODEL, model)
-                        .tag(MetricTags.DIRECTION, MetricTags.DIRECTION_INPUT)
-                        .register(registry)
-                        .increment(event.inputTokens());
+                    .tag(MetricTags.GEN_AI_SYSTEM, system)
+                    .tag(MetricTags.GEN_AI_REQUEST_MODEL, model)
+                    .tag(MetricTags.GEN_AI_TOKEN_TYPE, MetricTags.TOKEN_TYPE_INPUT)
+                    .register(registry)
+                    .increment(event.inputTokens());
             }
             if (event.outputTokens() != null) {
                 Counter.builder(MetricNames.TOKENS_TOTAL)
-                        .tag(MetricTags.PROVIDER, provider)
-                        .tag(MetricTags.MODEL, model)
-                        .tag(MetricTags.DIRECTION, MetricTags.DIRECTION_OUTPUT)
-                        .register(registry)
-                        .increment(event.outputTokens());
+                    .tag(MetricTags.GEN_AI_SYSTEM, system)
+                    .tag(MetricTags.GEN_AI_REQUEST_MODEL, model)
+                    .tag(MetricTags.GEN_AI_TOKEN_TYPE, MetricTags.TOKEN_TYPE_OUTPUT)
+                    .register(registry)
+                    .increment(event.outputTokens());
             }
             if (event.estimatedCostUsd() != null) {
                 Counter.builder(MetricNames.ESTIMATED_COST_USD_TOTAL)
-                        .tag(MetricTags.PROVIDER, provider)
-                        .tag(MetricTags.MODEL, model)
-                        .tag(MetricTags.VIRTUAL_KEY, virtualKey)
-                        .register(registry)
-                        .increment(event.estimatedCostUsd().doubleValue());
+                    .tag(MetricTags.GEN_AI_SYSTEM, system)
+                    .tag(MetricTags.GEN_AI_REQUEST_MODEL, model)
+                    .tag(MetricTags.VIRTUAL_KEY, virtualKey)
+                    .register(registry)
+                    .increment(event.estimatedCostUsd().doubleValue());
             }
 
             activeRequests.decrementAndGet();
@@ -123,10 +125,10 @@ public class MetricsCollector {
     private void onFallback(FallbackTriggeredEvent event) {
         try {
             Counter.builder(MetricNames.FALLBACKS_TOTAL)
-                    .tag(MetricTags.FROM_PROVIDER, StringUtils.defaultIfBlank(event.fromProvider(), MetricTags.NONE))
-                    .tag(MetricTags.TO_PROVIDER, StringUtils.defaultIfBlank(event.toProvider(), MetricTags.UNKNOWN))
-                    .register(registry)
-                    .increment();
+                .tag(MetricTags.FROM_PROVIDER, StringUtils.defaultIfBlank(event.fromProvider(), MetricTags.NONE))
+                .tag(MetricTags.TO_PROVIDER, StringUtils.defaultIfBlank(event.toProvider(), MetricTags.UNKNOWN))
+                .register(registry)
+                .increment();
         } catch (Exception e) {
             log.warn("MetricsCollector: error processing FallbackTriggeredEvent", e);
         }
@@ -146,10 +148,10 @@ public class MetricsCollector {
     private void onSpendLimitBreach(SpendLimitBreachedEvent event) {
         try {
             Counter.builder(MetricNames.SPEND_LIMIT_BREACHES_TOTAL)
-                    .tag(MetricTags.VIRTUAL_KEY, StringUtils.defaultIfBlank(event.virtualKeyId(), MetricTags.NONE))
-                    .tag(MetricTags.LIMIT_TYPE, StringUtils.defaultIfBlank(event.limitType(), MetricTags.UNKNOWN))
-                    .register(registry)
-                    .increment();
+                .tag(MetricTags.VIRTUAL_KEY, StringUtils.defaultIfBlank(event.virtualKeyId(), MetricTags.NONE))
+                .tag(MetricTags.LIMIT_TYPE, StringUtils.defaultIfBlank(event.limitType(), MetricTags.UNKNOWN))
+                .register(registry)
+                .increment();
         } catch (Exception e) {
             log.warn("MetricsCollector: error processing SpendLimitBreachedEvent", e);
         }
@@ -158,11 +160,11 @@ public class MetricsCollector {
     private void onCircuitBreakerTransition(CircuitBreakerStateChangeEvent event) {
         try {
             Counter.builder(MetricNames.CIRCUIT_BREAKER_TRANSITIONS_TOTAL)
-                    .tag(MetricTags.PROVIDER, StringUtils.defaultIfBlank(event.provider(), MetricTags.UNKNOWN))
-                    .tag(MetricTags.FROM_STATE, StringUtils.defaultIfBlank(event.fromState(), MetricTags.UNKNOWN))
-                    .tag(MetricTags.TO_STATE, StringUtils.defaultIfBlank(event.toState(), MetricTags.UNKNOWN))
-                    .register(registry)
-                    .increment();
+                .tag(MetricTags.GEN_AI_SYSTEM, StringUtils.defaultIfBlank(event.provider(), MetricTags.UNKNOWN))
+                .tag(MetricTags.FROM_STATE, StringUtils.defaultIfBlank(event.fromState(), MetricTags.UNKNOWN))
+                .tag(MetricTags.TO_STATE, StringUtils.defaultIfBlank(event.toState(), MetricTags.UNKNOWN))
+                .register(registry)
+                .increment();
         } catch (Exception e) {
             log.warn("MetricsCollector: error processing CircuitBreakerStateChangeEvent", e);
         }

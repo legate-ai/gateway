@@ -124,6 +124,10 @@ public class AuthenticationStep implements RequestPipelineStep {
             Instant retryAfter = Instant.now().plusSeconds(denied.retryAfter());
             throw new RateLimitExceededException(keyInfo.keyId(), denied.reason(), retryAfter);
         }
+
+        if (result instanceof RateLimitResult.Allowed allowed && allowed.reservedTokens() > 0) {
+            context.setReservedTokens(allowed.reservedTokens());
+        }
     }
 
     /**

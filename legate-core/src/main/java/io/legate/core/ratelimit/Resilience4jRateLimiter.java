@@ -37,9 +37,12 @@ public class Resilience4jRateLimiter implements RateLimiter {
     private static final Logger log = LoggerFactory.getLogger(Resilience4jRateLimiter.class);
     static final String GLOBAL_KEY = "__global__";
 
+    static final long ROLLING_WINDOW_MS = 60_000L;
+
     private volatile RateLimitingConfig config;
     private final RateLimiterRegistry r4jRegistry;
     private final ConcurrentHashMap<String, DailyTokenCounter> tokenCounters = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, SlidingWindowTokenBucket> rollingBuckets = new ConcurrentHashMap<>();
 
     /**
      * Creates a rate limiter from the given configuration.
@@ -84,20 +87,32 @@ public class Resilience4jRateLimiter implements RateLimiter {
 
     @Override
     public void reportUsage(String key, int actualTokens) {
-        if (actualTokens <= 0) {
+        reportUsage(key, 0, actualTokens);
+    }
+
+    @Override
+    public void reportUsage(String key, int reservedTokens, int actualTokens) {
+        if (actualTokens < 0) {
             return;
         }
+        int delta = actualTokens - reservedTokens;
 
-        // Deduct from global token counter
         RateLimitConfig globalCfg = config.global();
         if (globalCfg != null && globalCfg.hasTokenLimit()) {
-            getOrCreateTokenCounter(GLOBAL_KEY).add(actualTokens);
+            if (reservedTokens > 0) {
+                getOrCreateRollingBucket(GLOBAL_KEY, globalCfg).adjust(reservedTokens, actualTokens);
+            } else {
+                getOrCreateTokenCounter(GLOBAL_KEY).add(actualTokens);
+            }
         }
 
-        // Deduct from per-key token counter
         RateLimitConfig keyCfg = config.resolvePerKeyLimit(key);
         if (keyCfg.hasTokenLimit()) {
-            getOrCreateTokenCounter(key).add(actualTokens);
+            if (reservedTokens > 0) {
+                getOrCreateRollingBucket(key, keyCfg).adjust(reservedTokens, actualTokens);
+            } else {
+                getOrCreateTokenCounter(key).add(actualTokens);
+            }
         }
     }
 
@@ -119,18 +134,31 @@ public class Resilience4jRateLimiter implements RateLimiter {
                             rl.getMetrics().getAvailablePermissions()));
         }
 
-        // Check daily token quota atomically — tryReserve prevents TOCTOU race
+        // Pre-reserve in the rolling window bucket; also check daily cap.
         if (cfg.hasTokenLimit()) {
-            DailyTokenCounter counter = getOrCreateTokenCounter(key);
-            if (!counter.tryReserve(estimatedTokens, cfg.tokensPerDay())) {
+            SlidingWindowTokenBucket bucket = getOrCreateRollingBucket(key, cfg);
+            if (!bucket.tryReserve(estimatedTokens)) {
+                long secondsUntilReset = secondsUntilMidnightUtc();
+                return new RateLimitResult.Denied(
+                        "Rolling token limit exceeded for key '" + key + "'",
+                        secondsUntilReset,
+                        cfg.tokensPerDay(),
+                        bucket.getWindowTotal());
+            }
+            DailyTokenCounter daily = getOrCreateTokenCounter(key);
+            long used = daily.getUsed();
+            if (used + estimatedTokens > cfg.tokensPerDay()) {
+                // Undo the rolling reservation since we're rejecting
+                bucket.adjust(estimatedTokens, 0);
                 long secondsUntilReset = secondsUntilMidnightUtc();
                 return new RateLimitResult.Denied(
                         "Daily token limit exceeded: " + cfg.tokensPerDay()
                                 + " tokens/day for key '" + key + "'",
                         secondsUntilReset,
                         cfg.tokensPerDay(),
-                        counter.getUsed());
+                        used);
             }
+            daily.add(estimatedTokens);
         }
 
         int remainingRequests = rl != null
@@ -141,7 +169,7 @@ public class Resilience4jRateLimiter implements RateLimiter {
                 : Long.MAX_VALUE;
 
         return new RateLimitResult.Allowed(remainingRequests, remainingTokens,
-                Instant.now().plusSeconds(60));
+                Instant.now().plusSeconds(60), estimatedTokens);
     }
 
     private io.github.resilience4j.ratelimiter.RateLimiter getOrCreateRequestRateLimiter(
@@ -156,6 +184,11 @@ public class Resilience4jRateLimiter implements RateLimiter {
 
     private DailyTokenCounter getOrCreateTokenCounter(String key) {
         return tokenCounters.computeIfAbsent(key, k -> new DailyTokenCounter());
+    }
+
+    private SlidingWindowTokenBucket getOrCreateRollingBucket(String key, RateLimitConfig cfg) {
+        return rollingBuckets.computeIfAbsent(key,
+            k -> new SlidingWindowTokenBucket(cfg.tokensPerDay(), ROLLING_WINDOW_MS));
     }
 
     private static long secondsUntilMidnightUtc() {
