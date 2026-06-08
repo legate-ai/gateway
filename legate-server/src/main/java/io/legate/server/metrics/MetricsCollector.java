@@ -36,10 +36,12 @@ public class MetricsCollector {
 
     private static final Logger log = LoggerFactory.getLogger(MetricsCollector.class);
 
-    private final EventBus      eventBus;
+    private final EventBus eventBus;
     private final MeterRegistry registry;
 
-    /** Approximation of in-flight requests; incremented on received, decremented on completion. */
+    /**
+     * Approximation of in-flight requests; incremented on received, decremented on completion.
+     */
     private final AtomicLong activeRequests = new AtomicLong();
 
     public MetricsCollector(EventBus eventBus, MeterRegistry registry) {
@@ -54,11 +56,11 @@ public class MetricsCollector {
         eventBus.subscribe(RequestReceivedEvent.class, event -> activeRequests.incrementAndGet());
 
         eventBus.subscribe(CompletionEvent.class, this::onCompletion);
-        eventBus.subscribe(CacheHitEvent.class,  event -> incrementCounter(MetricNames.CACHE_HITS_TOTAL));
+        eventBus.subscribe(CacheHitEvent.class, event -> incrementCounter(MetricNames.CACHE_HITS_TOTAL));
         eventBus.subscribe(CacheMissEvent.class, event -> incrementCounter(MetricNames.CACHE_MISSES_TOTAL));
-        eventBus.subscribe(FallbackTriggeredEvent.class,         this::onFallback);
-        eventBus.subscribe(RateLimitBreachedEvent.class,         this::onRateLimitBreach);
-        eventBus.subscribe(SpendLimitBreachedEvent.class,        this::onSpendLimitBreach);
+        eventBus.subscribe(FallbackTriggeredEvent.class, this::onFallback);
+        eventBus.subscribe(RateLimitBreachedEvent.class, this::onRateLimitBreach);
+        eventBus.subscribe(SpendLimitBreachedEvent.class, this::onSpendLimitBreach);
         eventBus.subscribe(CircuitBreakerStateChangeEvent.class, this::onCircuitBreakerTransition);
 
         log.info("MetricsCollector initialised — subscribed to EventBus for Prometheus metrics");
@@ -135,9 +137,9 @@ public class MetricsCollector {
     private void onRateLimitBreach(RateLimitBreachedEvent event) {
         try {
             Counter.builder(MetricNames.RATE_LIMIT_BREACHES_TOTAL)
-                .tag(MetricTags.VIRTUAL_KEY, StringUtils.defaultIfBlank(event.virtualKeyId(), MetricTags.NONE))
-                .register(registry)
-                .increment();
+                    .tag(MetricTags.VIRTUAL_KEY, StringUtils.defaultIfBlank(event.virtualKeyId(), MetricTags.NONE))
+                    .register(registry)
+                    .increment();
         } catch (Exception e) {
             log.warn("MetricsCollector: error processing RateLimitBreachedEvent", e);
         }

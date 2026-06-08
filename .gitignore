@@ -24,6 +24,8 @@ hs_err_pid*
 # Spring Boot
 spring-shell.log
 
+bruno
+
 # Logs
 logs/
 *.log

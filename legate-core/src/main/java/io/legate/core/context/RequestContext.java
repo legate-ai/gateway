@@ -1,5 +1,6 @@
 package io.legate.core.context;
 
+import io.legate.core.guard.GuardDecision;
 import io.legate.core.model.ChatCompletionRequest;
 import io.legate.core.model.ChatCompletionResponse;
 import io.legate.core.model.Usage;
@@ -24,7 +25,7 @@ public class RequestContext {
     private ChatCompletionRequest originalRequest;
     private ChatCompletionRequest effectiveRequest;
     private Map<String, String> requestHeaders = Map.of();
-    private final List<Object> guardDecisions = new ArrayList<>();
+    private final List<GuardDecision> guardDecisions = new ArrayList<>();
     private RoutingDecision routingDecision;
     private boolean cacheHit;
     private int fallbackAttempts;
@@ -126,11 +127,11 @@ public class RequestContext {
         this.requestHeaders = requestHeaders != null ? requestHeaders : Map.of();
     }
 
-    public List<Object> getGuardDecisions() {
+    public List<GuardDecision> getGuardDecisions() {
         return guardDecisions;
     }
 
-    public void addGuardDecision(Object decision) {
+    public void addGuardDecision(GuardDecision decision) {
         this.guardDecisions.add(decision);
     }
 

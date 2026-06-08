@@ -38,10 +38,14 @@ public final class MetricTags {
     /** Spend limit type that was breached (e.g., "daily", "monthly"). */
     public static final String LIMIT_TYPE = "limit_type";
 
-    /** Circuit breaker state before a transition. */
+    /**
+     * Circuit breaker state before a transition.
+     */
     public static final String FROM_STATE = "from_state";
 
-    /** Circuit breaker state after a transition. */
+    /**
+     * Circuit breaker state after a transition.
+     */
     public static final String TO_STATE = "to_state";
 
     // ── Tag values ────────────────────────────────────────────────────────────

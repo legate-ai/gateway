@@ -29,8 +29,8 @@ public class ApiResponseFactory {
      */
     public Mono<ServerResponse> ok(Object body) {
         return ServerResponse.ok()
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body);
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body);
     }
 
     /**
@@ -103,17 +103,17 @@ public class ApiResponseFactory {
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private Mono<ServerResponse> errorResponse(
-        HttpStatus status,
-        String code,
-        String message,
-        String requestId
+            HttpStatus status,
+            String code,
+            String message,
+            String requestId
     ) {
         LegateErrorEnvelope envelope = requestId != null
-            ? LegateErrorEnvelope.of(code, message, requestId)
-            : LegateErrorEnvelope.of(code, message);
+                ? LegateErrorEnvelope.of(code, message, requestId)
+                : LegateErrorEnvelope.of(code, message);
 
         return ServerResponse.status(status)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(envelope);
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(envelope);
     }
 }

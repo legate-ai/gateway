@@ -36,8 +36,7 @@ public class CircuitBreakerRegistry {
             io.legate.core.config.routing.CircuitBreakerConfig config,
             EventBus eventBus) {
         this.eventBus = eventBus;
-        this.r4jRegistry = io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
-                .of(toR4jConfig(config));
+        this.r4jRegistry = io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry.of(toR4jConfig(config));
 
         // Register a listener so every newly-created CB automatically publishes
         // state-transition events to Legate's EventBus.

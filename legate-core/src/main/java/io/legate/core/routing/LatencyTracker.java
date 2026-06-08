@@ -1,6 +1,7 @@
 package io.legate.core.routing;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -20,24 +21,30 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class LatencyTracker {
 
-    /** Smoothing factor for EWMA. Higher = more reactive to recent samples. */
+    /**
+     * Smoothing factor for EWMA. Higher = more reactive to recent samples.
+     */
     private static final double ALPHA = 0.3;
 
-    /** Default latency used when no samples are recorded yet (1 second). */
+    /**
+     * Default latency used when no samples are recorded yet (1 second).
+     */
     private static final long DEFAULT_LATENCY_MS = 1_000L;
 
-    private final ConcurrentHashMap<String, LatencyEntry> entries = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, LatencyEntry> entries = new ConcurrentHashMap<>();
 
     /**
      * Records a latency sample for the given endpoint.
      *
-     * @param endpoint   the resolved endpoint
-     * @param latencyMs  observed latency in milliseconds; must be &gt;= 0
+     * @param endpoint  the resolved endpoint
+     * @param latencyMs observed latency in milliseconds; must be &gt;= 0
      */
     public void record(ResolvedEndpoint endpoint, long latencyMs) {
-        if (latencyMs < 0) return;
+        if (latencyMs < 0) {
+            return;
+        }
         entries.computeIfAbsent(endpoint.getKey(), k -> new LatencyEntry())
-               .update(latencyMs);
+                .update(latencyMs);
     }
 
     /**
@@ -71,7 +78,7 @@ public class LatencyTracker {
 
     private static final class LatencyEntry {
         private double ewma = DEFAULT_LATENCY_MS;
-        private long   samples = 0;
+        private long samples = 0;
 
         synchronized void update(long latencyMs) {
             if (samples == 0) {

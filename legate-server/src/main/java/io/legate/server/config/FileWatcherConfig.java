@@ -1,6 +1,9 @@
 package io.legate.server.config;
 
 import io.legate.core.config.LegateConfig;
+import io.legate.core.meter.SpendTracker;
+import io.legate.core.ratelimit.RateLimiter;
+import io.legate.core.ratelimit.Resilience4jRateLimiter;
 import io.legate.core.routing.RoutingEngine;
 import io.legate.spring.properties.LegateProperties;
 import org.slf4j.Logger;
@@ -45,6 +48,8 @@ public class FileWatcherConfig implements DisposableBean {
 
     private final RoutingEngine routingEngine;
     private final LegateProperties legateProperties;
+    private final SpendTracker spendTracker;
+    private final RateLimiter rateLimiter;
     private final ScheduledExecutorService scheduler =
         Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "legate-file-watcher");
@@ -58,10 +63,14 @@ public class FileWatcherConfig implements DisposableBean {
     public FileWatcherConfig(
         RoutingEngine routingEngine,
         LegateProperties legateProperties,
+        SpendTracker spendTracker,
+        RateLimiter rateLimiter,
         @Value("${legate.config.watch-path:}") String watchPath
     ) {
         this.routingEngine    = routingEngine;
         this.legateProperties = legateProperties;
+        this.spendTracker     = spendTracker;
+        this.rateLimiter      = rateLimiter;
         if (watchPath != null && !watchPath.isBlank()) {
             startWatching(Path.of(watchPath));
         } else {
@@ -78,7 +87,11 @@ public class FileWatcherConfig implements DisposableBean {
         try {
             LegateConfig newConfig = legateProperties.toLegateConfig();
             routingEngine.reload(newConfig);
-            log.info("Config reloaded on demand.");
+            spendTracker.reload(newConfig.spendControl());
+            if (rateLimiter instanceof Resilience4jRateLimiter r4j) {
+                r4j.reload(newConfig.rateLimiting());
+            }
+            log.info("Config reloaded: routing, spend, and rate-limits updated.");
             return true;
         } catch (Exception e) {
             log.error("Config reload failed: {}", e.getMessage(), e);
