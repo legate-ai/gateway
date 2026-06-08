@@ -54,6 +54,7 @@ public class ChatCompletionHandler {
     private static final Scheduler VIRTUAL = Schedulers.fromExecutor(
         Executors.newVirtualThreadPerTaskExecutor());
 
+    private final RequestPipeline requestPipeline;
     private final PostResponsePipeline postResponsePipeline;
     private final RoutingExecutor routingExecutor;
     private final ResponseCache responseCache;

@@ -2,9 +2,9 @@ package io.legate.server.config;
 
 import io.legate.core.config.LegateConfig;
 import io.legate.core.meter.SpendTracker;
+import io.legate.core.ratelimit.RateLimiter;
 import io.legate.core.ratelimit.Resilience4jRateLimiter;
 import io.legate.core.routing.RoutingEngine;
-import io.legate.server.handler.ChatCompletionHandler;
 import io.legate.spring.properties.LegateProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,8 +49,7 @@ public class FileWatcherConfig implements DisposableBean {
     private final RoutingEngine routingEngine;
     private final LegateProperties legateProperties;
     private final SpendTracker spendTracker;
-    private final Resilience4jRateLimiter rateLimiter;
-    private final ChatCompletionHandler chatCompletionHandler;
+    private final RateLimiter rateLimiter;
     private final ScheduledExecutorService scheduler =
         Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "legate-file-watcher");
@@ -65,15 +64,13 @@ public class FileWatcherConfig implements DisposableBean {
         RoutingEngine routingEngine,
         LegateProperties legateProperties,
         SpendTracker spendTracker,
-        Resilience4jRateLimiter rateLimiter,
-        ChatCompletionHandler chatCompletionHandler,
+        RateLimiter rateLimiter,
         @Value("${legate.config.watch-path:}") String watchPath
     ) {
-        this.routingEngine         = routingEngine;
-        this.legateProperties      = legateProperties;
-        this.spendTracker          = spendTracker;
-        this.rateLimiter           = rateLimiter;
-        this.chatCompletionHandler = chatCompletionHandler;
+        this.routingEngine    = routingEngine;
+        this.legateProperties = legateProperties;
+        this.spendTracker     = spendTracker;
+        this.rateLimiter      = rateLimiter;
         if (watchPath != null && !watchPath.isBlank()) {
             startWatching(Path.of(watchPath));
         } else {
@@ -91,9 +88,10 @@ public class FileWatcherConfig implements DisposableBean {
             LegateConfig newConfig = legateProperties.toLegateConfig();
             routingEngine.reload(newConfig);
             spendTracker.reload(newConfig.spendControl());
-            rateLimiter.reload(newConfig.rateLimiting());
-            chatCompletionHandler.reload(newConfig);
-            log.info("Config reloaded: routing, spend, rate-limits, and handler updated.");
+            if (rateLimiter instanceof Resilience4jRateLimiter r4j) {
+                r4j.reload(newConfig.rateLimiting());
+            }
+            log.info("Config reloaded: routing, spend, and rate-limits updated.");
             return true;
         } catch (Exception e) {
             log.error("Config reload failed: {}", e.getMessage(), e);

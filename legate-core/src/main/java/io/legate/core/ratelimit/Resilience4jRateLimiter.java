@@ -58,8 +58,9 @@ public class Resilience4jRateLimiter implements RateLimiter {
     public RateLimitResult tryAcquire(String key, int estimatedTokens) {
         // Check per-key limit FIRST — if per-key denies, global permit is never consumed
         RateLimitConfig keyCfg = config.resolvePerKeyLimit(key);
+        RateLimitResult keyResult = null;
         if (!keyCfg.isUnlimited()) {
-            RateLimitResult keyResult = checkLimits(key, keyCfg, estimatedTokens);
+            keyResult = checkLimits(key, keyCfg, estimatedTokens);
             if (keyResult instanceof RateLimitResult.Denied) {
                 return keyResult;
             }
@@ -71,6 +72,10 @@ public class Resilience4jRateLimiter implements RateLimiter {
             return checkLimits(GLOBAL_KEY, globalCfg, estimatedTokens);
         }
 
+        // Return per-key result when available — it carries accurate remaining counts
+        if (keyResult != null) {
+            return keyResult;
+        }
         return new RateLimitResult.Allowed(Integer.MAX_VALUE, Long.MAX_VALUE,
                 Instant.now().plusSeconds(60));
     }
