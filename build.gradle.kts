@@ -25,7 +25,7 @@ subprojects {
 
     configure<JavaPluginExtension> {
         toolchain {
-            languageVersion.set(JavaLanguageVersion.of(25))
+            languageVersion.set(JavaLanguageVersion.of(26))
         }
     }
 
@@ -41,7 +41,8 @@ subprojects {
     tasks.withType<Javadoc> {
         isFailOnError = false
         val opts = options as StandardJavadocDocletOptions
-        opts.addStringOption("source", "25")
+        opts.addStringOption("source", "26")
+        opts.addStringOption("source", "26")
         opts.quiet()
     }
 
